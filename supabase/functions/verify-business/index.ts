@@ -12,10 +12,15 @@ interface VerifyBusinessRequest {
   walletAddress: string;
   businessName: string;
   externalUserId: string;
+  forceRefresh?: boolean;
 }
+
+const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 
 interface VerifyBusinessResponse {
   success: boolean;
+  cached?: boolean;
+  cacheExpiresAt?: string;
   data?: {
     verificationId: string;
     walletAddress: string;
@@ -164,9 +169,9 @@ serve(async (req) => {
       );
     }
 
-    const { walletAddress, businessName, externalUserId }: VerifyBusinessRequest = await req.json();
+    const { walletAddress, businessName, externalUserId, forceRefresh = false }: VerifyBusinessRequest = await req.json();
     
-    console.log('Received verification request:', { walletAddress, businessName, externalUserId });
+    console.log('Received verification request:', { walletAddress, businessName, externalUserId, forceRefresh });
 
     // Check rate limit before processing (5 requests per hour per wallet)
     if (walletAddress && walletAddress.trim().length > 0) {
@@ -244,6 +249,54 @@ serve(async (req) => {
       );
     }
 
+    // Check for cached verification result (unless force refresh requested)
+    if (!forceRefresh) {
+      const { data: cachedData } = await supabase
+        .from('business_verifications')
+        .select('*')
+        .eq('wallet_address', walletAddress.trim())
+        .maybeSingle();
+      
+      if (cachedData) {
+        const cacheAge = Date.now() - new Date(cachedData.updated_at).getTime();
+        const cacheExpiresAt = new Date(new Date(cachedData.updated_at).getTime() + CACHE_DURATION_MS).toISOString();
+        
+        if (cacheAge < CACHE_DURATION_MS) {
+          console.log(`Returning cached verification result for wallet: ${walletAddress} (age: ${Math.round(cacheAge / 1000)}s)`);
+          return new Response(
+            JSON.stringify({ 
+              success: true,
+              cached: true,
+              cacheExpiresAt,
+              data: {
+                verificationId: cachedData.id,
+                walletAddress: cachedData.wallet_address,
+                businessName: cachedData.business_name,
+                totalTransactions: cachedData.total_transactions,
+                uniqueWallets: cachedData.unique_wallets,
+                meetsRequirements: cachedData.meets_requirements,
+                failureReason: cachedData.failure_reason,
+                verificationStatus: cachedData.verification_status,
+                verifiedAt: cachedData.updated_at,
+              }
+            } as VerifyBusinessResponse),
+            {
+              headers: { 
+                ...corsHeaders, 
+                'Content-Type': 'application/json',
+                'X-Cache': 'HIT',
+                'X-Cache-Expires': cacheExpiresAt
+              },
+            }
+          );
+        } else {
+          console.log(`Cache expired for wallet: ${walletAddress}, fetching fresh data`);
+        }
+      }
+    } else {
+      console.log('Force refresh requested, bypassing cache');
+    }
+
     // Query real Pi Network blockchain
     console.log('Querying Pi Network blockchain...');
     const { totalTransactions, uniqueWallets } = await verifyWalletOnPiNetwork(walletAddress.trim());
@@ -301,9 +354,13 @@ serve(async (req) => {
 
     console.log('Verification saved successfully:', dbData);
 
+    const cacheExpiresAt = new Date(Date.now() + CACHE_DURATION_MS).toISOString();
+
     return new Response(
       JSON.stringify({ 
-        success: true, 
+        success: true,
+        cached: false,
+        cacheExpiresAt,
         data: {
           verificationId: dbData.id,
           walletAddress: dbData.wallet_address,
@@ -317,7 +374,12 @@ serve(async (req) => {
         }
       } as VerifyBusinessResponse),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-Cache': 'MISS',
+          'X-Cache-Expires': cacheExpiresAt
+        },
       }
     );
 
