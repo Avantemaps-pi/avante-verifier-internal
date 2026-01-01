@@ -168,6 +168,39 @@ serve(async (req) => {
     
     console.log('Received verification request:', { walletAddress, businessName, externalUserId });
 
+    // Check rate limit before processing (5 requests per hour per wallet)
+    if (walletAddress && walletAddress.trim().length > 0) {
+      const { data: rateLimitData, error: rateLimitError } = await supabase
+        .rpc('check_rate_limit', { 
+          p_wallet_address: walletAddress.trim(),
+          p_max_requests: 5,
+          p_window_hours: 1
+        });
+
+      if (rateLimitError) {
+        console.error('Rate limit check error:', rateLimitError);
+      } else if (rateLimitData && rateLimitData.length > 0 && !rateLimitData[0].allowed) {
+        const resetAt = new Date(rateLimitData[0].reset_at).toISOString();
+        console.log(`Rate limit exceeded for wallet: ${walletAddress}, resets at: ${resetAt}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Rate limit exceeded. Maximum 5 verification requests per hour per wallet. Try again after ${resetAt}` 
+          } as VerifyBusinessResponse),
+          {
+            status: 429,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'X-RateLimit-Limit': '5',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': resetAt
+            },
+          }
+        );
+      }
+    }
+
     // Validate wallet address format
     if (!isValidPiWalletAddress(walletAddress.trim())) {
       console.error('Invalid Pi wallet address format');
