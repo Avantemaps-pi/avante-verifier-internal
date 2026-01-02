@@ -13,6 +13,8 @@ interface VerifyBusinessRequest {
   businessName: string;
   externalUserId: string;
   forceRefresh?: boolean;
+  webhookUrl?: string;
+  webhookSecret?: string;
 }
 
 const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -33,6 +35,111 @@ interface VerifyBusinessResponse {
     verifiedAt: string;
   };
   error?: string;
+  webhookQueued?: boolean;
+}
+
+interface WebhookPayload {
+  event: 'verification.completed' | 'verification.failed';
+  timestamp: string;
+  data: {
+    verificationId: string;
+    walletAddress: string;
+    businessName: string;
+    externalUserId: string;
+    totalTransactions: number;
+    uniqueWallets: number;
+    meetsRequirements: boolean;
+    failureReason: string | null;
+    verificationStatus: string;
+    verifiedAt: string;
+  };
+}
+
+// Send webhook notification (runs as background task)
+async function sendWebhookNotification(
+  webhookUrl: string,
+  payload: WebhookPayload,
+  webhookSecret?: string
+): Promise<void> {
+  const maxRetries = 3;
+  const retryDelays = [0, 1000, 5000]; // immediate, 1s, 5s
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+      }
+      
+      console.log(`Sending webhook notification (attempt ${attempt + 1}/${maxRetries}) to: ${webhookUrl}`);
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Avante-Business-Verifier/1.0',
+        'X-Webhook-Event': payload.event,
+        'X-Webhook-Timestamp': payload.timestamp,
+      };
+      
+      // Add signature if secret provided
+      if (webhookSecret) {
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(webhookSecret),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const signature = await crypto.subtle.sign(
+          'HMAC',
+          key,
+          encoder.encode(JSON.stringify(payload))
+        );
+        const signatureHex = Array.from(new Uint8Array(signature))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        headers['X-Webhook-Signature'] = `sha256=${signatureHex}`;
+      }
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        console.log(`Webhook notification sent successfully (status: ${response.status})`);
+        return;
+      }
+      
+      console.warn(`Webhook response not OK: ${response.status} ${response.statusText}`);
+      
+      // Don't retry on client errors (4xx) except 429
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        console.error(`Webhook failed with client error, not retrying`);
+        return;
+      }
+    } catch (error) {
+      console.error(`Webhook attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : error);
+    }
+  }
+  
+  console.error(`All webhook retry attempts exhausted for: ${webhookUrl}`);
+}
+
+// Validate webhook URL
+function isValidWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 // Validate Pi Network wallet address (Stellar-compatible format)
@@ -169,9 +276,23 @@ serve(async (req) => {
       );
     }
 
-    const { walletAddress, businessName, externalUserId, forceRefresh = false }: VerifyBusinessRequest = await req.json();
+    const { walletAddress, businessName, externalUserId, forceRefresh = false, webhookUrl, webhookSecret }: VerifyBusinessRequest = await req.json();
     
-    console.log('Received verification request:', { walletAddress, businessName, externalUserId, forceRefresh });
+    console.log('Received verification request:', { walletAddress, businessName, externalUserId, forceRefresh, webhookUrl: webhookUrl ? '[provided]' : undefined });
+
+    // Validate webhook URL if provided
+    if (webhookUrl && !isValidWebhookUrl(webhookUrl)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid webhook URL: must be a valid HTTP/HTTPS URL' 
+        } as VerifyBusinessResponse),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Check rate limit before processing (5 requests per hour per wallet)
     if (walletAddress && walletAddress.trim().length > 0) {
@@ -356,11 +477,39 @@ serve(async (req) => {
 
     const cacheExpiresAt = new Date(Date.now() + CACHE_DURATION_MS).toISOString();
 
+    // Queue webhook notification as background task if URL provided
+    let webhookQueued = false;
+    if (webhookUrl) {
+      const webhookPayload: WebhookPayload = {
+        event: 'verification.completed',
+        timestamp: new Date().toISOString(),
+        data: {
+          verificationId: dbData.id,
+          walletAddress: dbData.wallet_address,
+          businessName: dbData.business_name,
+          externalUserId: dbData.external_user_id,
+          totalTransactions: dbData.total_transactions,
+          uniqueWallets: dbData.unique_wallets,
+          meetsRequirements: dbData.meets_requirements,
+          failureReason: dbData.failure_reason,
+          verificationStatus: dbData.verification_status,
+          verifiedAt: dbData.updated_at,
+        },
+      };
+      
+      // Use EdgeRuntime.waitUntil for background task
+      (globalThis as any).EdgeRuntime?.waitUntil?.(sendWebhookNotification(webhookUrl, webhookPayload, webhookSecret)) 
+        ?? sendWebhookNotification(webhookUrl, webhookPayload, webhookSecret);
+      webhookQueued = true;
+      console.log('Webhook notification queued for background delivery');
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true,
         cached: false,
         cacheExpiresAt,
+        webhookQueued,
         data: {
           verificationId: dbData.id,
           walletAddress: dbData.wallet_address,
