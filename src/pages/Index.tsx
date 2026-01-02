@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { VerificationForm } from "@/components/VerificationForm";
 import { VerificationResults } from "@/components/VerificationResults";
+import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 
 interface VerificationData {
   verificationId: string;
@@ -23,6 +26,16 @@ const Index = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-destructive/5 pointer-events-none" />
       <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-destructive/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* API Docs Link */}
+      <div className="absolute top-4 right-4 z-20">
+        <Link to="/docs">
+          <Button variant="outline" size="sm" className="gap-2">
+            <FileText className="h-4 w-4" />
+            API Docs
+          </Button>
+        </Link>
+      </div>
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-4xl space-y-8">
