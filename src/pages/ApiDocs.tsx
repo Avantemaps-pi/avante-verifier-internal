@@ -41,6 +41,7 @@ const Section = ({ title, id, children }: { title: string; id: string; children:
 
 const ApiDocs = () => {
   const baseUrl = "https://cknlxuespsymlvtwkeqh.supabase.co/functions/v1/verify-business";
+  const batchUrl = "https://cknlxuespsymlvtwkeqh.supabase.co/functions/v1/verify-business-batch";
 
   const basicExample = `curl -X POST "${baseUrl}" \\
   -H "Content-Type: application/json" \\
@@ -117,10 +118,63 @@ const ApiDocs = () => {
 // X-RateLimit-Remaining: 0
 // X-RateLimit-Reset: 2025-01-02T15:30:00.000Z`;
 
+  const batchRequest = `curl -X POST "${batchUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{
+    "verifications": [
+      {
+        "walletAddress": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "businessName": "Business One",
+        "externalUserId": "user_001"
+      },
+      {
+        "walletAddress": "GYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
+        "businessName": "Business Two",
+        "externalUserId": "user_002"
+      }
+    ],
+    "forceRefresh": false,
+    "webhookUrl": "https://your-server.com/batch-webhook"
+  }'`;
+
+  const batchResponse = `{
+  "success": true,
+  "batchId": "550e8400-e29b-41d4-a716-446655440000",
+  "totalRequested": 2,
+  "totalProcessed": 2,
+  "totalSuccessful": 2,
+  "totalFailed": 0,
+  "webhookQueued": true,
+  "results": [
+    {
+      "walletAddress": "GXXX...",
+      "businessName": "Business One",
+      "success": true,
+      "cached": false,
+      "data": {
+        "verificationId": "...",
+        "totalTransactions": 150,
+        "uniqueWallets": 25,
+        "meetsRequirements": true,
+        "verificationStatus": "approved"
+      }
+    },
+    {
+      "walletAddress": "GYYY...",
+      "businessName": "Business Two",
+      "success": true,
+      "cached": true,
+      "data": { ... }
+    }
+  ]
+}`;
+
   const tableOfContents = [
     { id: "overview", label: "Overview" },
     { id: "authentication", label: "Authentication" },
-    { id: "request", label: "Request Format" },
+    { id: "request", label: "Single Verification" },
+    { id: "batch", label: "Batch Verification" },
     { id: "response", label: "Response Format" },
     { id: "caching", label: "Caching" },
     { id: "rate-limiting", label: "Rate Limiting" },
@@ -271,6 +325,53 @@ const ApiDocs = () => {
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">Basic Example</p>
                 <CodeBlock code={basicExample} language="bash" />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Batch Verification" id="batch">
+            <div className="space-y-6">
+              <p className="text-muted-foreground">
+                Process multiple wallet verifications in a single request. Maximum <strong className="text-foreground">10 wallets</strong> per batch.
+              </p>
+
+              <div className="flex items-center gap-2 text-sm">
+                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded font-mono">POST</span>
+                <code className="text-muted-foreground bg-muted/50 px-3 py-1 rounded-md text-sm break-all">
+                  {batchUrl}
+                </code>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-2xl font-bold text-primary">10</p>
+                  <p className="text-sm text-muted-foreground">Max batch size</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-2xl font-bold text-primary">3</p>
+                  <p className="text-sm text-muted-foreground">Parallel processing</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-2xl font-bold text-primary">Per-wallet</p>
+                  <p className="text-sm text-muted-foreground">Rate limiting</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Batch Request Example</p>
+                <CodeBlock code={batchRequest} language="bash" />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Batch Response</p>
+                <CodeBlock code={batchResponse} />
+              </div>
+
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                <p className="text-sm text-foreground">
+                  <strong>Note:</strong> Each wallet in the batch is subject to individual rate limiting (5 requests/hour). 
+                  Failed verifications are included in the results array with an error message.
+                </p>
               </div>
             </div>
           </Section>

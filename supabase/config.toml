@@ -2,3 +2,6 @@ project_id = "cknlxuespsymlvtwkeqh"
 
 [functions.verify-business]
 verify_jwt = false
+
+[functions.verify-business-batch]
+verify_jwt = false
