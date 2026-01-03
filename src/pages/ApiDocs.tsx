@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, Copy, Check, ExternalLink, Code, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 
 const CodeBlock = ({ code, language = "json" }: { code: string; language?: string }) => {
@@ -170,11 +171,287 @@ const ApiDocs = () => {
   ]
 }`;
 
+  // JavaScript SDK Examples
+  const jsInstallExample = `npm install axios
+# or
+yarn add axios`;
+
+  const jsSingleVerifyExample = `import axios from 'axios';
+
+const API_BASE_URL = '${baseUrl.replace('/verify-business', '')}';
+const API_KEY = 'your-api-key';
+
+async function verifyBusiness(walletAddress, businessName, externalUserId) {
+  try {
+    const response = await axios.post(
+      \`\${API_BASE_URL}/verify-business\`,
+      { walletAddress, businessName, externalUserId },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      throw new Error(\`Verification failed: \${error.response.data.error}\`);
+    }
+    throw error;
+  }
+}
+
+// Usage
+const result = await verifyBusiness(
+  'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  'My Coffee Shop',
+  'user_123'
+);
+console.log('Status:', result.data.verificationStatus);`;
+
+  const jsBatchVerifyExample = `async function verifyBusinessBatch(verifications, options = {}) {
+  const response = await axios.post(
+    \`\${API_BASE_URL}/verify-business-batch\`,
+    {
+      verifications,
+      forceRefresh: options.forceRefresh || false,
+      webhookUrl: options.webhookUrl
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY
+      }
+    }
+  );
+  return response.data;
+}
+
+// Usage
+const results = await verifyBusinessBatch([
+  { walletAddress: 'GXXX...', businessName: 'Shop A', externalUserId: 'user_1' },
+  { walletAddress: 'GYYY...', businessName: 'Shop B', externalUserId: 'user_2' }
+]);
+console.log(\`Processed: \${results.totalSuccessful}/\${results.totalProcessed}\`);`;
+
+  const jsWebhookHandlerExample = `import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+const WEBHOOK_SECRET = 'your-webhook-secret';
+
+app.post('/webhook/verification', (req, res) => {
+  const signature = req.headers['x-webhook-signature'];
+  
+  // Verify signature if secret is configured
+  if (WEBHOOK_SECRET && signature) {
+    const expectedSig = 'sha256=' + crypto
+      .createHmac('sha256', WEBHOOK_SECRET)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+    
+    if (signature !== expectedSig) {
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+  }
+  
+  const { event, data } = req.body;
+  console.log(\`Verification \${data.verificationStatus} for \${data.businessName}\`);
+  
+  res.status(200).json({ received: true });
+});`;
+
+  const jsClientClassExample = `class VerificationClient {
+  constructor(apiKey, baseUrl = '${baseUrl.replace('/verify-business', '')}') {
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl;
+  }
+
+  async verify(walletAddress, businessName, externalUserId, options = {}) {
+    const response = await fetch(\`\${this.baseUrl}/verify-business\`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey
+      },
+      body: JSON.stringify({
+        walletAddress, businessName, externalUserId,
+        forceRefresh: options.forceRefresh,
+        webhookUrl: options.webhookUrl
+      })
+    });
+    if (!response.ok) throw new Error((await response.json()).error);
+    return response.json();
+  }
+
+  async verifyBatch(verifications, options = {}) {
+    const response = await fetch(\`\${this.baseUrl}/verify-business-batch\`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey
+      },
+      body: JSON.stringify({ verifications, ...options })
+    });
+    if (!response.ok) throw new Error((await response.json()).error);
+    return response.json();
+  }
+}
+
+// Usage
+const client = new VerificationClient('your-api-key');
+const result = await client.verify('GXXX...', 'My Shop', 'user_123');`;
+
+  // Python SDK Examples
+  const pyInstallExample = `pip install requests`;
+
+  const pySingleVerifyExample = `import requests
+
+API_BASE_URL = "${baseUrl.replace('/verify-business', '')}"
+API_KEY = "your-api-key"
+
+def verify_business(wallet_address: str, business_name: str, external_user_id: str) -> dict:
+    """Verify a single business wallet address."""
+    response = requests.post(
+        f"{API_BASE_URL}/verify-business",
+        json={
+            "walletAddress": wallet_address,
+            "businessName": business_name,
+            "externalUserId": external_user_id
+        },
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY
+        }
+    )
+    response.raise_for_status()
+    return response.json()
+
+# Usage
+result = verify_business(
+    "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "My Coffee Shop",
+    "user_123"
+)
+print(f"Status: {result['data']['verificationStatus']}")`;
+
+  const pyBatchVerifyExample = `from typing import List, Optional
+
+def verify_business_batch(
+    verifications: List[dict],
+    force_refresh: bool = False,
+    webhook_url: Optional[str] = None
+) -> dict:
+    """Verify multiple business wallet addresses."""
+    payload = {
+        "verifications": verifications,
+        "forceRefresh": force_refresh
+    }
+    if webhook_url:
+        payload["webhookUrl"] = webhook_url
+    
+    response = requests.post(
+        f"{API_BASE_URL}/verify-business-batch",
+        json=payload,
+        headers={"Content-Type": "application/json", "x-api-key": API_KEY}
+    )
+    response.raise_for_status()
+    return response.json()
+
+# Usage
+results = verify_business_batch([
+    {"walletAddress": "GXXX...", "businessName": "Shop A", "externalUserId": "user_1"},
+    {"walletAddress": "GYYY...", "businessName": "Shop B", "externalUserId": "user_2"}
+])
+print(f"Processed: {results['totalSuccessful']}/{results['totalProcessed']}")`;
+
+  const pyWebhookHandlerExample = `from flask import Flask, request, jsonify
+import hmac
+import hashlib
+
+app = Flask(__name__)
+WEBHOOK_SECRET = "your-webhook-secret"
+
+@app.route("/webhook/verification", methods=["POST"])
+def handle_webhook():
+    signature = request.headers.get("X-Webhook-Signature", "")
+    
+    # Verify signature if secret is configured
+    if WEBHOOK_SECRET and signature:
+        expected = "sha256=" + hmac.new(
+            WEBHOOK_SECRET.encode(),
+            request.data,
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            return jsonify({"error": "Invalid signature"}), 401
+    
+    data = request.json
+    print(f"Verification {data['data']['verificationStatus']} for {data['data']['businessName']}")
+    
+    return jsonify({"received": True}), 200`;
+
+  const pyClientClassExample = `import requests
+from typing import List, Optional, Dict, Any
+from dataclasses import dataclass
+
+@dataclass
+class VerificationResult:
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    cached: bool = False
+
+class VerificationClient:
+    """Client for the Business Verification API."""
+    
+    def __init__(self, api_key: str, base_url: str = "${baseUrl.replace('/verify-business', '')}"):
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Content-Type": "application/json",
+            "x-api-key": api_key
+        })
+        self.base_url = base_url
+    
+    def verify(self, wallet_address: str, business_name: str, 
+               external_user_id: str, **options) -> VerificationResult:
+        response = self.session.post(
+            f"{self.base_url}/verify-business",
+            json={
+                "walletAddress": wallet_address,
+                "businessName": business_name,
+                "externalUserId": external_user_id,
+                **options
+            }
+        )
+        response.raise_for_status()
+        result = response.json()
+        return VerificationResult(
+            success=result.get("success", False),
+            data=result.get("data"),
+            cached=result.get("cached", False)
+        )
+    
+    def verify_batch(self, verifications: List[dict], **options) -> dict:
+        response = self.session.post(
+            f"{self.base_url}/verify-business-batch",
+            json={"verifications": verifications, **options}
+        )
+        response.raise_for_status()
+        return response.json()
+
+# Usage
+client = VerificationClient("your-api-key")
+result = client.verify("GXXX...", "My Shop", "user_123")`;
+
   const tableOfContents = [
     { id: "overview", label: "Overview" },
     { id: "authentication", label: "Authentication" },
     { id: "request", label: "Single Verification" },
     { id: "batch", label: "Batch Verification" },
+    { id: "sdk-examples", label: "SDK Examples" },
     { id: "response", label: "Response Format" },
     { id: "caching", label: "Caching" },
     { id: "rate-limiting", label: "Rate Limiting" },
@@ -373,6 +650,81 @@ const ApiDocs = () => {
                   Failed verifications are included in the results array with an error message.
                 </p>
               </div>
+            </div>
+          </Section>
+
+          <Section title="SDK Examples" id="sdk-examples">
+            <div className="space-y-6">
+              <p className="text-muted-foreground">
+                Use these code examples to integrate the Verification API into your application.
+              </p>
+
+              <Tabs defaultValue="javascript" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="javascript" className="flex items-center gap-2">
+                    <Terminal className="h-4 w-4" />
+                    JavaScript
+                  </TabsTrigger>
+                  <TabsTrigger value="python" className="flex items-center gap-2">
+                    <Code className="h-4 w-4" />
+                    Python
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="javascript" className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Installation</p>
+                    <CodeBlock code={jsInstallExample} language="bash" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Single Verification</p>
+                    <CodeBlock code={jsSingleVerifyExample} language="javascript" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Batch Verification</p>
+                    <CodeBlock code={jsBatchVerifyExample} language="javascript" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Webhook Handler (Express.js)</p>
+                    <CodeBlock code={jsWebhookHandlerExample} language="javascript" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Full Client Class</p>
+                    <CodeBlock code={jsClientClassExample} language="javascript" />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="python" className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Installation</p>
+                    <CodeBlock code={pyInstallExample} language="bash" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Single Verification</p>
+                    <CodeBlock code={pySingleVerifyExample} language="python" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Batch Verification</p>
+                    <CodeBlock code={pyBatchVerifyExample} language="python" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Webhook Handler (Flask)</p>
+                    <CodeBlock code={pyWebhookHandlerExample} language="python" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Full Client Class</p>
+                    <CodeBlock code={pyClientClassExample} language="python" />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </Section>
 
