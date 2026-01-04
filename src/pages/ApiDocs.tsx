@@ -1,33 +1,13 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Copy, Check, ExternalLink, Code, Terminal } from "lucide-react";
+import { ArrowLeft, Copy, Check, ExternalLink, Code, Terminal, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
+import { SyntaxHighlighter } from "@/components/SyntaxHighlighter";
+import { ApiPlayground } from "@/components/ApiPlayground";
 
 const CodeBlock = ({ code, language = "json" }: { code: string; language?: string }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="relative group">
-      <pre className="bg-muted/50 border border-border rounded-lg p-4 overflow-x-auto text-sm">
-        <code className="text-muted-foreground">{code}</code>
-      </pre>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-        onClick={handleCopy}
-      >
-        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-      </Button>
-    </div>
-  );
+  return <SyntaxHighlighter code={code} language={language} />;
 };
 
 const Section = ({ title, id, children }: { title: string; id: string; children: React.ReactNode }) => (
@@ -784,6 +764,7 @@ result = client.verify("GXXX...", "My Shop", "user_123")`;
 
   const tableOfContents = [
     { id: "overview", label: "Overview" },
+    { id: "playground", label: "API Playground" },
     { id: "authentication", label: "Authentication" },
     { id: "request", label: "Single Verification" },
     { id: "batch", label: "Batch Verification" },
@@ -863,6 +844,15 @@ result = client.verify("GXXX...", "My Shop", "user_123")`;
                   <p className="text-sm text-muted-foreground">Cache duration</p>
                 </div>
               </div>
+            </div>
+          </Section>
+
+          <Section title="API Playground" id="playground">
+            <div className="space-y-4">
+              <p className="text-muted-foreground">
+                Test the verification endpoint directly from your browser. Enter your API key and request parameters below.
+              </p>
+              <ApiPlayground baseUrl={baseUrl} batchUrl={batchUrl} />
             </div>
           </Section>
 

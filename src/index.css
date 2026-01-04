@@ -42,6 +42,17 @@ All colors MUST be HSL.
     --gradient-card: linear-gradient(145deg, hsl(0 0% 12%), hsl(0 0% 8%));
     --glow-purple: 0 0 40px hsl(280 100% 70% / 0.3);
     --glow-red: 0 0 40px hsl(0 84% 60% / 0.3);
+
+    /* Syntax highlighting colors */
+    --syntax-keyword: 280 100% 70%;
+    --syntax-string: 142 71% 45%;
+    --syntax-number: 35 100% 60%;
+    --syntax-comment: 0 0% 45%;
+    --syntax-function: 199 95% 60%;
+    --syntax-property: 35 100% 70%;
+    --syntax-operator: 0 84% 60%;
+    --syntax-variable: 199 80% 70%;
+    --syntax-type: 280 80% 80%;
   }
 }
 
