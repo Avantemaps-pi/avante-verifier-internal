@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { SyntaxHighlighter } from "@/components/SyntaxHighlighter";
 import { ApiPlayground } from "@/components/ApiPlayground";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const CodeBlock = ({ code, language = "json" }: { code: string; language?: string }) => {
   return <SyntaxHighlighter code={code} language={language} />;
@@ -785,7 +786,10 @@ result = client.verify("GXXX...", "My Shop", "user_123")`;
             <ArrowLeft className="h-4 w-4" />
             <span>Back to Verifier</span>
           </Link>
-          <h1 className="text-lg font-semibold text-foreground">API Documentation</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-semibold text-foreground">API Documentation</h1>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

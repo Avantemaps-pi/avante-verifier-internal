@@ -54,6 +54,52 @@ All colors MUST be HSL.
     --syntax-variable: 199 80% 70%;
     --syntax-type: 280 80% 80%;
   }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 280 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 280 30% 90%;
+    --secondary-foreground: 280 60% 30%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 280 100% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 280 100% 50%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(280 100% 50%), hsl(280 100% 40%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(0 0% 96%));
+    --glow-purple: 0 0 40px hsl(280 100% 50% / 0.2);
+    --glow-red: 0 0 40px hsl(0 84% 50% / 0.2);
+
+    /* Syntax highlighting colors - light mode */
+    --syntax-keyword: 280 100% 40%;
+    --syntax-string: 142 71% 35%;
+    --syntax-number: 35 100% 40%;
+    --syntax-comment: 0 0% 55%;
+    --syntax-function: 199 95% 40%;
+    --syntax-property: 35 100% 45%;
+    --syntax-operator: 0 84% 45%;
+    --syntax-variable: 199 80% 40%;
+    --syntax-type: 280 80% 50%;
+  }
 }
 
 @layer base {
