@@ -37,6 +37,8 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
   const [businessName, setBusinessName] = useState("");
   const [externalUserId, setExternalUserId] = useState("");
   const [forceRefresh, setForceRefresh] = useState(false);
+  const [minTransactions, setMinTransactions] = useState("100");
+  const [minUniqueWallets, setMinUniqueWallets] = useState("10");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<VerificationResult | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
@@ -53,18 +55,30 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
     const startTime = Date.now();
 
     try {
+      const requestBody: Record<string, unknown> = {
+        walletAddress,
+        businessName,
+        externalUserId,
+        forceRefresh,
+      };
+      
+      // Only include thresholds if they differ from defaults
+      const minTx = parseInt(minTransactions);
+      const minWallets = parseInt(minUniqueWallets);
+      if (!isNaN(minTx) && minTx !== 100) {
+        requestBody.minTransactions = minTx;
+      }
+      if (!isNaN(minWallets) && minWallets !== 10) {
+        requestBody.minUniqueWallets = minWallets;
+      }
+      
       const res = await fetch(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": apiKey,
         },
-        body: JSON.stringify({
-          walletAddress,
-          businessName,
-          externalUserId,
-          forceRefresh,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();
@@ -97,13 +111,25 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
   };
 
   const generateCurlCommand = () => {
+    const minTx = parseInt(minTransactions);
+    const minWallets = parseInt(minUniqueWallets);
+    const hasCustomThresholds = (!isNaN(minTx) && minTx !== 100) || (!isNaN(minWallets) && minWallets !== 10);
+    
+    let thresholdParams = "";
+    if (!isNaN(minTx) && minTx !== 100) {
+      thresholdParams += `,\n    "minTransactions": ${minTx}`;
+    }
+    if (!isNaN(minWallets) && minWallets !== 10) {
+      thresholdParams += `,\n    "minUniqueWallets": ${minWallets}`;
+    }
+    
     return `curl -X POST "${baseUrl}" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ${apiKey || "YOUR_API_KEY"}" \\
   -d '{
     "walletAddress": "${walletAddress || "GXXX..."}",
     "businessName": "${businessName || "My Business"}",
-    "externalUserId": "${externalUserId || "user_123"}"${forceRefresh ? ',\n    "forceRefresh": true' : ""}
+    "externalUserId": "${externalUserId || "user_123"}"${forceRefresh ? ',\n    "forceRefresh": true' : ""}${thresholdParams}
   }'`;
   };
 
@@ -194,6 +220,40 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
                     Force refresh (bypass cache)
                   </Label>
                 </div>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minTransactions" className="text-foreground">
+                  Minimum Transactions
+                </Label>
+                <Input
+                  id="minTransactions"
+                  type="number"
+                  min="1"
+                  placeholder="100"
+                  value={minTransactions}
+                  onChange={(e) => setMinTransactions(e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Default: 100</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="minUniqueWallets" className="text-foreground">
+                  Minimum Unique Wallets
+                </Label>
+                <Input
+                  id="minUniqueWallets"
+                  type="number"
+                  min="1"
+                  placeholder="10"
+                  value={minUniqueWallets}
+                  onChange={(e) => setMinUniqueWallets(e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Default: 10</p>
               </div>
             </div>
           </div>

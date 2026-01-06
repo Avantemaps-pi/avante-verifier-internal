@@ -34,6 +34,17 @@ const ApiDocs = () => {
     "externalUserId": "user_123"
   }'`;
 
+  const customThresholdsExample = `curl -X POST "${baseUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{
+    "walletAddress": "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "businessName": "My Business",
+    "externalUserId": "user_123",
+    "minTransactions": 50,
+    "minUniqueWallets": 5
+  }'`;
+
   const forceRefreshExample = `curl -X POST "${baseUrl}" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: YOUR_API_KEY" \\
@@ -300,6 +311,8 @@ export interface VerificationRequest {
   forceRefresh?: boolean;
   webhookUrl?: string;
   webhookSecret?: string;
+  minTransactions?: number;    // Custom threshold (default: 100)
+  minUniqueWallets?: number;   // Custom threshold (default: 10)
 }
 
 export interface VerificationData {
@@ -323,10 +336,12 @@ export interface VerificationResponse {
 }
 
 export interface BatchVerificationRequest {
-  verifications: Omit<VerificationRequest, 'forceRefresh' | 'webhookUrl' | 'webhookSecret'>[];
+  verifications: Omit<VerificationRequest, 'forceRefresh' | 'webhookUrl' | 'webhookSecret' | 'minTransactions' | 'minUniqueWallets'>[];
   forceRefresh?: boolean;
   webhookUrl?: string;
   webhookSecret?: string;
+  minTransactions?: number;    // Custom threshold for batch
+  minUniqueWallets?: number;   // Custom threshold for batch
 }
 
 export interface BatchResult {
@@ -831,17 +846,19 @@ result = client.verify("GXXX...", "My Shop", "user_123")`;
             <div className="prose prose-invert max-w-none space-y-4">
               <p className="text-muted-foreground">
                 The Verification API allows you to verify Pi Network wallet activity for businesses. 
-                It checks if a wallet has at least <strong className="text-foreground">100 transactions</strong> and 
-                <strong className="text-foreground"> 10 unique wallet interactions</strong>.
+                By default, it checks if a wallet has at least <strong className="text-foreground">100 transactions</strong> and 
+                <strong className="text-foreground"> 10 unique wallet interactions</strong>. These thresholds are configurable per request.
               </p>
               <div className="grid sm:grid-cols-3 gap-4 not-prose">
                 <div className="bg-card border border-border rounded-lg p-4">
                   <p className="text-2xl font-bold text-primary">100+</p>
-                  <p className="text-sm text-muted-foreground">Minimum transactions</p>
+                  <p className="text-sm text-muted-foreground">Default min transactions</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Configurable</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-4">
                   <p className="text-2xl font-bold text-primary">10+</p>
-                  <p className="text-sm text-muted-foreground">Unique wallets</p>
+                  <p className="text-sm text-muted-foreground">Default unique wallets</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Configurable</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-4">
                   <p className="text-2xl font-bold text-primary">1 hour</p>
@@ -925,6 +942,18 @@ result = client.verify("GXXX...", "My Shop", "user_123")`;
                       <td className="py-3 px-4"><span className="text-muted-foreground">No</span></td>
                       <td className="py-3 px-4">Secret for webhook signature verification (HMAC-SHA256)</td>
                     </tr>
+                    <tr className="border-b border-border/50">
+                      <td className="py-3 px-4 font-mono text-primary">minTransactions</td>
+                      <td className="py-3 px-4">number</td>
+                      <td className="py-3 px-4"><span className="text-muted-foreground">No</span></td>
+                      <td className="py-3 px-4">Custom minimum transactions threshold (default: 100)</td>
+                    </tr>
+                    <tr className="border-b border-border/50">
+                      <td className="py-3 px-4 font-mono text-primary">minUniqueWallets</td>
+                      <td className="py-3 px-4">number</td>
+                      <td className="py-3 px-4"><span className="text-muted-foreground">No</span></td>
+                      <td className="py-3 px-4">Custom minimum unique wallets threshold (default: 10)</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -932,6 +961,11 @@ result = client.verify("GXXX...", "My Shop", "user_123")`;
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">Basic Example</p>
                 <CodeBlock code={basicExample} language="bash" />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Custom Thresholds Example</p>
+                <CodeBlock code={customThresholdsExample} language="bash" />
               </div>
             </div>
           </Section>
