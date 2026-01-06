@@ -8,6 +8,10 @@ const corsHeaders = {
 
 const PI_HORIZON_API = 'https://api.mainnet.minepi.com';
 
+// Default thresholds (can be overridden by environment variables)
+const DEFAULT_MIN_TRANSACTIONS = parseInt(Deno.env.get('MIN_TRANSACTIONS') || '100');
+const DEFAULT_MIN_UNIQUE_WALLETS = parseInt(Deno.env.get('MIN_UNIQUE_WALLETS') || '10');
+
 interface VerifyBusinessRequest {
   walletAddress: string;
   businessName: string;
@@ -15,6 +19,8 @@ interface VerifyBusinessRequest {
   forceRefresh?: boolean;
   webhookUrl?: string;
   webhookSecret?: string;
+  minTransactions?: number;
+  minUniqueWallets?: number;
 }
 
 const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -276,9 +282,30 @@ serve(async (req) => {
       );
     }
 
-    const { walletAddress, businessName, externalUserId, forceRefresh = false, webhookUrl, webhookSecret }: VerifyBusinessRequest = await req.json();
+    const { 
+      walletAddress, 
+      businessName, 
+      externalUserId, 
+      forceRefresh = false, 
+      webhookUrl, 
+      webhookSecret,
+      minTransactions,
+      minUniqueWallets
+    }: VerifyBusinessRequest = await req.json();
     
-    console.log('Received verification request:', { walletAddress, businessName, externalUserId, forceRefresh, webhookUrl: webhookUrl ? '[provided]' : undefined });
+    // Use request-level overrides if provided, otherwise fall back to environment defaults
+    const effectiveMinTransactions = minTransactions ?? DEFAULT_MIN_TRANSACTIONS;
+    const effectiveMinUniqueWallets = minUniqueWallets ?? DEFAULT_MIN_UNIQUE_WALLETS;
+    
+    console.log('Received verification request:', { 
+      walletAddress, 
+      businessName, 
+      externalUserId, 
+      forceRefresh, 
+      webhookUrl: webhookUrl ? '[provided]' : undefined,
+      minTransactions: effectiveMinTransactions,
+      minUniqueWallets: effectiveMinUniqueWallets
+    });
 
     // Validate webhook URL if provided
     if (webhookUrl && !isValidWebhookUrl(webhookUrl)) {
@@ -424,17 +451,17 @@ serve(async (req) => {
     
     console.log('Pi Network blockchain data:', { totalTransactions, uniqueWallets });
 
-    // Business rules evaluation
-    const meetsRequirements = totalTransactions >= 100 && uniqueWallets >= 10;
+    // Business rules evaluation using effective thresholds
+    const meetsRequirements = totalTransactions >= effectiveMinTransactions && uniqueWallets >= effectiveMinUniqueWallets;
     let failureReason: string | null = null;
     
     if (!meetsRequirements) {
-      if (totalTransactions < 100 && uniqueWallets < 10) {
-        failureReason = `Insufficient transactions (${totalTransactions}/100) and unique wallets (${uniqueWallets}/10)`;
-      } else if (totalTransactions < 100) {
-        failureReason = `Insufficient transactions (${totalTransactions}/100)`;
+      if (totalTransactions < effectiveMinTransactions && uniqueWallets < effectiveMinUniqueWallets) {
+        failureReason = `Insufficient transactions (${totalTransactions}/${effectiveMinTransactions}) and unique wallets (${uniqueWallets}/${effectiveMinUniqueWallets})`;
+      } else if (totalTransactions < effectiveMinTransactions) {
+        failureReason = `Insufficient transactions (${totalTransactions}/${effectiveMinTransactions})`;
       } else {
-        failureReason = `Insufficient unique wallets (${uniqueWallets}/10)`;
+        failureReason = `Insufficient unique wallets (${uniqueWallets}/${effectiveMinUniqueWallets})`;
       }
     }
     

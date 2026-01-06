@@ -11,6 +11,10 @@ const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour
 const MAX_BATCH_SIZE = 10;
 const CONCURRENCY_LIMIT = 3;
 
+// Default thresholds (can be overridden by environment variables)
+const DEFAULT_MIN_TRANSACTIONS = parseInt(Deno.env.get('MIN_TRANSACTIONS') || '100');
+const DEFAULT_MIN_UNIQUE_WALLETS = parseInt(Deno.env.get('MIN_UNIQUE_WALLETS') || '10');
+
 interface BatchVerificationRequest {
   verifications: {
     walletAddress: string;
@@ -20,6 +24,8 @@ interface BatchVerificationRequest {
   forceRefresh?: boolean;
   webhookUrl?: string;
   webhookSecret?: string;
+  minTransactions?: number;
+  minUniqueWallets?: number;
 }
 
 interface VerificationResult {
@@ -136,7 +142,9 @@ async function fetchAccountPayments(walletAddress: string): Promise<{
 async function processVerification(
   supabase: any,
   wallet: { walletAddress: string; businessName: string; externalUserId: string },
-  forceRefresh: boolean
+  forceRefresh: boolean,
+  minTransactions: number,
+  minUniqueWallets: number
 ): Promise<VerificationResult> {
   const { walletAddress, businessName, externalUserId } = wallet;
   
@@ -203,16 +211,16 @@ async function processVerification(
     const { totalTransactions, uniqueWallets } = await fetchAccountPayments(walletAddress.trim());
     const uniqueWalletsCount = uniqueWallets.size;
     
-    const meetsRequirements = totalTransactions >= 100 && uniqueWalletsCount >= 10;
+    const meetsRequirements = totalTransactions >= minTransactions && uniqueWalletsCount >= minUniqueWallets;
     let failureReason: string | null = null;
     
     if (!meetsRequirements) {
       const reasons: string[] = [];
-      if (totalTransactions < 100) {
-        reasons.push(`Only ${totalTransactions} transactions (requires 100+)`);
+      if (totalTransactions < minTransactions) {
+        reasons.push(`Only ${totalTransactions} transactions (requires ${minTransactions}+)`);
       }
-      if (uniqueWalletsCount < 10) {
-        reasons.push(`Only ${uniqueWalletsCount} unique wallets (requires 10+)`);
+      if (uniqueWalletsCount < minUniqueWallets) {
+        reasons.push(`Only ${uniqueWalletsCount} unique wallets (requires ${minUniqueWallets}+)`);
       }
       failureReason = reasons.join('; ');
     }
@@ -391,9 +399,20 @@ serve(async (req) => {
       );
     }
 
-    const { verifications, forceRefresh = false, webhookUrl, webhookSecret }: BatchVerificationRequest = await req.json();
+    const { 
+      verifications, 
+      forceRefresh = false, 
+      webhookUrl, 
+      webhookSecret,
+      minTransactions,
+      minUniqueWallets
+    }: BatchVerificationRequest = await req.json();
     
-    console.log(`Received batch verification request for ${verifications?.length || 0} wallets`);
+    // Use request-level overrides if provided, otherwise fall back to environment defaults
+    const effectiveMinTransactions = minTransactions ?? DEFAULT_MIN_TRANSACTIONS;
+    const effectiveMinUniqueWallets = minUniqueWallets ?? DEFAULT_MIN_UNIQUE_WALLETS;
+    
+    console.log(`Received batch verification request for ${verifications?.length || 0} wallets (thresholds: ${effectiveMinTransactions} tx, ${effectiveMinUniqueWallets} wallets)`);
 
     // Validate request
     if (!verifications || !Array.isArray(verifications) || verifications.length === 0) {
@@ -434,7 +453,7 @@ serve(async (req) => {
     // Process verifications with concurrency limit
     const results = await processWithConcurrency(
       verifications,
-      (v) => processVerification(supabase, v, forceRefresh),
+      (v) => processVerification(supabase, v, forceRefresh, effectiveMinTransactions, effectiveMinUniqueWallets),
       CONCURRENCY_LIMIT
     );
 
