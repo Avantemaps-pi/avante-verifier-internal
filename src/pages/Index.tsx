@@ -32,7 +32,7 @@ const Index = () => {
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-destructive/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Bar */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+      <div className="absolute top-4 left-4 sm:left-auto sm:right-4 z-20 flex items-center gap-2">
         <PiLoginButton />
         <ThemeToggle />
         <Link to="/docs">
