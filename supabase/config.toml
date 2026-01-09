@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.verify-business-batch]
 verify_jwt = false
+
+[functions.verify-pi-token]
+verify_jwt = false
+
+[functions.approve-pi-payment]
+verify_jwt = false
+
+[functions.complete-pi-payment]
+verify_jwt = false
