@@ -9,6 +9,11 @@ interface GetPaymentHistoryRequest {
   externalUserId: string;
   page?: number;
   pageSize?: number;
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -27,7 +32,16 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const body: GetPaymentHistoryRequest = await req.json();
-    const { externalUserId, page = 1, pageSize = 10 } = body;
+    const { 
+      externalUserId, 
+      page = 1, 
+      pageSize = 10,
+      startDate,
+      endDate,
+      status,
+      minAmount,
+      maxAmount
+    } = body;
 
     if (!externalUserId) {
       return new Response(
@@ -38,7 +52,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get all records for summary calculation
+    // Build base query for summary (unfiltered for overall stats)
     const { data: allRecords, error: summaryError } = await supabase
       .from('payment_records')
       .select('amount, status')
@@ -52,8 +66,8 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calculate summary statistics
-    const totalRecords = allRecords?.length || 0;
+    // Calculate summary statistics (overall, not filtered)
+    const overallTotalRecords = allRecords?.length || 0;
     const totalAmount = allRecords?.reduce((sum, record) => sum + Number(record.amount), 0) || 0;
     const statusBreakdown: Record<string, { count: number; amount: number }> = {};
     
@@ -65,16 +79,76 @@ serve(async (req: Request): Promise<Response> => {
       statusBreakdown[record.status].amount += Number(record.amount);
     });
 
-    // Calculate pagination
+    // Build filtered query for count
+    let countQuery = supabase
+      .from('payment_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('external_user_id', externalUserId);
+
+    if (startDate) {
+      countQuery = countQuery.gte('created_at', startDate);
+    }
+    if (endDate) {
+      // Add one day to include the end date fully
+      const endDateObj = new Date(endDate);
+      endDateObj.setDate(endDateObj.getDate() + 1);
+      countQuery = countQuery.lt('created_at', endDateObj.toISOString());
+    }
+    if (status && status !== 'all') {
+      countQuery = countQuery.eq('status', status);
+    }
+    if (minAmount !== undefined && minAmount !== null) {
+      countQuery = countQuery.gte('amount', minAmount);
+    }
+    if (maxAmount !== undefined && maxAmount !== null) {
+      countQuery = countQuery.lte('amount', maxAmount);
+    }
+
+    const { count: filteredCount, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error('Failed to count filtered records:', countError);
+    }
+
+    const totalRecords = filteredCount || 0;
     const totalPages = Math.ceil(totalRecords / pageSize);
     const offset = (page - 1) * pageSize;
 
-    const { data, error } = await supabase
+    // Build filtered query for data
+    let dataQuery = supabase
       .from('payment_records')
       .select('id, payment_id, amount, memo, status, txid, created_at')
-      .eq('external_user_id', externalUserId)
+      .eq('external_user_id', externalUserId);
+
+    if (startDate) {
+      dataQuery = dataQuery.gte('created_at', startDate);
+    }
+    if (endDate) {
+      const endDateObj = new Date(endDate);
+      endDateObj.setDate(endDateObj.getDate() + 1);
+      dataQuery = dataQuery.lt('created_at', endDateObj.toISOString());
+    }
+    if (status && status !== 'all') {
+      dataQuery = dataQuery.eq('status', status);
+    }
+    if (minAmount !== undefined && minAmount !== null) {
+      dataQuery = dataQuery.gte('amount', minAmount);
+    }
+    if (maxAmount !== undefined && maxAmount !== null) {
+      dataQuery = dataQuery.lte('amount', maxAmount);
+    }
+
+    const { data, error } = await dataQuery
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error('Failed to fetch payment history:', error);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to fetch payment history' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (error) {
       console.error('Failed to fetch payment history:', error);
@@ -95,10 +169,11 @@ serve(async (req: Request): Promise<Response> => {
           totalPages,
         },
         summary: {
-          totalPayments: totalRecords,
+          totalPayments: overallTotalRecords,
           totalAmount,
           statusBreakdown,
-        }
+        },
+        filteredCount: totalRecords,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

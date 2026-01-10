@@ -1,11 +1,18 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Receipt, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, Hash, PieChart, Download, FileText } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Receipt, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, Hash, PieChart, Download, FileText, CalendarIcon, Filter, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePiAuth } from "@/contexts/PiAuthContext";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -43,6 +50,14 @@ interface PaymentSummary {
   statusBreakdown: Record<string, { count: number; amount: number }>;
 }
 
+interface Filters {
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  status: string;
+  minAmount: string;
+  maxAmount: string;
+}
+
 const PAGE_SIZE = 10;
 
 export const PaymentHistory = () => {
@@ -56,6 +71,21 @@ export const PaymentHistory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    startDate: undefined,
+    endDate: undefined,
+    status: 'all',
+    minAmount: '',
+    maxAmount: '',
+  });
+  const [appliedFilters, setAppliedFilters] = useState<Filters>({
+    startDate: undefined,
+    endDate: undefined,
+    status: 'all',
+    minAmount: '',
+    maxAmount: '',
+  });
 
   const getExternalUserId = (): string => {
     if (user?.uid) {
@@ -64,12 +94,34 @@ export const PaymentHistory = () => {
     return getOrCreateSessionId();
   };
 
-  const fetchPaymentHistory = async (page: number = 1) => {
+  const buildFilterParams = (filterState: Filters) => {
+    const params: Record<string, unknown> = {};
+    if (filterState.startDate) {
+      params.startDate = filterState.startDate.toISOString();
+    }
+    if (filterState.endDate) {
+      params.endDate = filterState.endDate.toISOString();
+    }
+    if (filterState.status && filterState.status !== 'all') {
+      params.status = filterState.status;
+    }
+    if (filterState.minAmount) {
+      params.minAmount = parseFloat(filterState.minAmount);
+    }
+    if (filterState.maxAmount) {
+      params.maxAmount = parseFloat(filterState.maxAmount);
+    }
+    return params;
+  };
+
+  const fetchPaymentHistory = async (page: number = 1, filterState: Filters = appliedFilters) => {
     setIsLoading(true);
     try {
       const externalUserId = getExternalUserId();
+      const filterParams = buildFilterParams(filterState);
+      
       const { data, error } = await supabase.functions.invoke('get-payment-history', {
-        body: { externalUserId, page, pageSize: PAGE_SIZE },
+        body: { externalUserId, page, pageSize: PAGE_SIZE, ...filterParams },
       });
 
       if (error) {
@@ -99,11 +151,13 @@ export const PaymentHistory = () => {
     setIsExpanded(!isExpanded);
   };
 
-  const fetchAllPaymentsForExport = async () => {
+  const fetchAllPaymentsForExport = async (filterState: Filters = appliedFilters) => {
     try {
       const externalUserId = getExternalUserId();
+      const filterParams = buildFilterParams(filterState);
+      
       const { data, error } = await supabase.functions.invoke('get-payment-history', {
-        body: { externalUserId, page: 1, pageSize: 1000 },
+        body: { externalUserId, page: 1, pageSize: 1000, ...filterParams },
       });
 
       if (error) {
@@ -117,6 +171,38 @@ export const PaymentHistory = () => {
     } catch (error) {
       console.error('Export fetch error:', error);
     }
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters({ ...filters });
+    setCurrentPage(1);
+    fetchPaymentHistory(1, filters);
+    fetchAllPaymentsForExport(filters);
+    toast.success('Filters applied');
+  };
+
+  const clearFilters = () => {
+    const clearedFilters: Filters = {
+      startDate: undefined,
+      endDate: undefined,
+      status: 'all',
+      minAmount: '',
+      maxAmount: '',
+    };
+    setFilters(clearedFilters);
+    setAppliedFilters(clearedFilters);
+    setCurrentPage(1);
+    fetchPaymentHistory(1, clearedFilters);
+    fetchAllPaymentsForExport(clearedFilters);
+    toast.success('Filters cleared');
+  };
+
+  const hasActiveFilters = () => {
+    return appliedFilters.startDate || 
+           appliedFilters.endDate || 
+           (appliedFilters.status && appliedFilters.status !== 'all') || 
+           appliedFilters.minAmount || 
+           appliedFilters.maxAmount;
   };
 
   const formatDate = (dateString: string) => {
@@ -219,7 +305,7 @@ export const PaymentHistory = () => {
         startY: summary ? 58 : 35,
         head: [['Date', 'Amount', 'Status', 'Memo', 'Transaction ID']],
         body: tableData,
-        headStyles: { fillColor: [139, 92, 246] }, // Purple color
+        headStyles: { fillColor: [139, 92, 246] },
         styles: { fontSize: 9, cellPadding: 3 },
         columnStyles: {
           0: { cellWidth: 45 },
@@ -264,12 +350,12 @@ export const PaymentHistory = () => {
 
       {isExpanded && (
         <div className="mt-4 pt-4 border-t border-border/50">
-          {isLoading ? (
+          {isLoading && !hasLoaded ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span className="ml-2 text-muted-foreground">Loading payments...</span>
             </div>
-          ) : payments.length === 0 ? (
+          ) : payments.length === 0 && !hasActiveFilters() ? (
             <div className="text-center py-8">
               <Receipt className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
               <p className="text-muted-foreground">No payment records found</p>
@@ -316,6 +402,185 @@ export const PaymentHistory = () => {
                 </div>
               )}
 
+              {/* Filter Toggle Button */}
+              <div className="flex items-center gap-2 mb-4">
+                <Button
+                  variant={showFilters ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {hasActiveFilters() && (
+                    <Badge variant="default" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      !
+                    </Badge>
+                  )}
+                </Button>
+                {hasActiveFilters() && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="gap-1 text-muted-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
+              {/* Filter Panel */}
+              {showFilters && (
+                <div className="p-4 rounded-lg bg-muted/30 border border-border/50 space-y-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Date Range */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Start Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !filters.startDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {filters.startDate ? format(filters.startDate, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={filters.startDate}
+                            onSelect={(date) => setFilters({ ...filters, startDate: date })}
+                            disabled={(date) => date > new Date()}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm">End Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !filters.endDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {filters.endDate ? format(filters.endDate, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={filters.endDate}
+                            onSelect={(date) => setFilters({ ...filters, endDate: date })}
+                            disabled={(date) => date > new Date() || (filters.startDate && date < filters.startDate)}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Status</Label>
+                      <Select
+                        value={filters.status}
+                        onValueChange={(value) => setFilters({ ...filters, status: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All statuses</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="failed">Failed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Amount Range */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Amount Range (π)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Min"
+                          value={filters.minAmount}
+                          onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+                          className="w-full"
+                          min="0"
+                          step="0.01"
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <Input
+                          type="number"
+                          placeholder="Max"
+                          value={filters.maxAmount}
+                          onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
+                          className="w-full"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowFilters(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={applyFilters} disabled={isLoading}>
+                      {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Filters Display */}
+              {hasActiveFilters() && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {appliedFilters.startDate && (
+                    <Badge variant="secondary" className="gap-1">
+                      From: {format(appliedFilters.startDate, "MMM d, yyyy")}
+                    </Badge>
+                  )}
+                  {appliedFilters.endDate && (
+                    <Badge variant="secondary" className="gap-1">
+                      To: {format(appliedFilters.endDate, "MMM d, yyyy")}
+                    </Badge>
+                  )}
+                  {appliedFilters.status && appliedFilters.status !== 'all' && (
+                    <Badge variant="secondary" className="gap-1 capitalize">
+                      Status: {appliedFilters.status}
+                    </Badge>
+                  )}
+                  {appliedFilters.minAmount && (
+                    <Badge variant="secondary" className="gap-1">
+                      Min: {appliedFilters.minAmount}π
+                    </Badge>
+                  )}
+                  {appliedFilters.maxAmount && (
+                    <Badge variant="secondary" className="gap-1">
+                      Max: {appliedFilters.maxAmount}π
+                    </Badge>
+                  )}
+                </div>
+              )}
+
               {/* Export Buttons */}
               {allPayments.length > 0 && (
                 <div className="flex items-center gap-2 mb-4">
@@ -349,90 +614,103 @@ export const PaymentHistory = () => {
                   </Button>
                 </div>
               )}
-              
-              {/* Payments List */}
-              <div className="space-y-3">
-              {payments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="p-4 rounded-lg bg-background/50 border border-border/30 hover:border-border/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-foreground">
-                          {payment.amount} π
-                        </span>
-                        <Badge variant={getStatusBadgeVariant(payment.status)}>
-                          {payment.status}
-                        </Badge>
-                      </div>
-                      {payment.memo && (
-                        <p className="text-sm text-muted-foreground truncate">
-                          {payment.memo}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground/70 mt-1">
-                        {formatDate(payment.created_at)}
-                      </p>
-                    </div>
-                    {payment.txid && (
-                      <a
-                        href={`https://pi.blockexplorer.com/tx/${payment.txid}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        View
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              {/* Pagination Controls */}
-              {pagination && pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4 border-t border-border/30">
-                  <p className="text-sm text-muted-foreground">
-                    Page {currentPage} of {pagination.totalPages} ({pagination.totalRecords} records)
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchPaymentHistory(currentPage - 1)}
-                      disabled={isLoading || currentPage <= 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      <span className="sr-only">Previous</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchPaymentHistory(currentPage + 1)}
-                      disabled={isLoading || currentPage >= pagination.totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                      <span className="sr-only">Next</span>
-                    </Button>
-                  </div>
+
+              {/* No Results with Filters */}
+              {payments.length === 0 && hasActiveFilters() && (
+                <div className="text-center py-8">
+                  <Filter className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="text-muted-foreground">No payments match your filters</p>
+                  <Button variant="link" onClick={clearFilters} className="mt-2">
+                    Clear filters
+                  </Button>
                 </div>
               )}
               
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fetchPaymentHistory(currentPage)}
-                  className="w-full mt-2"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  Refresh
-                </Button>
-              </div>
+              {/* Payments List */}
+              {payments.length > 0 && (
+                <div className="space-y-3">
+                  {payments.map((payment) => (
+                    <div
+                      key={payment.id}
+                      className="p-4 rounded-lg bg-background/50 border border-border/30 hover:border-border/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-foreground">
+                              {payment.amount} π
+                            </span>
+                            <Badge variant={getStatusBadgeVariant(payment.status)}>
+                              {payment.status}
+                            </Badge>
+                          </div>
+                          {payment.memo && (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {payment.memo}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground/70 mt-1">
+                            {formatDate(payment.created_at)}
+                          </p>
+                        </div>
+                        {payment.txid && (
+                          <a
+                            href={`https://pi.blockexplorer.com/tx/${payment.txid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            View
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                
+                  {/* Pagination Controls */}
+                  {pagination && pagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-border/30">
+                      <p className="text-sm text-muted-foreground">
+                        Page {currentPage} of {pagination.totalPages} ({pagination.totalRecords} records)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchPaymentHistory(currentPage - 1)}
+                          disabled={isLoading || currentPage <= 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          <span className="sr-only">Previous</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchPaymentHistory(currentPage + 1)}
+                          disabled={isLoading || currentPage >= pagination.totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                          <span className="sr-only">Next</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchPaymentHistory(currentPage)}
+                    className="w-full mt-2"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Refresh
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
