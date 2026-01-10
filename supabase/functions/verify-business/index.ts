@@ -261,12 +261,18 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate API key
+    // Authentication: Accept either API key (for external API access) or Supabase auth header (for internal frontend calls)
     const apiKey = req.headers.get('x-api-key');
     const validApiKey = Deno.env.get('PI_API_KEY');
+    const authHeader = req.headers.get('authorization');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     
-    if (!apiKey || apiKey !== validApiKey) {
-      console.error('Invalid or missing API key');
+    // Check if this is an internal call (has valid Supabase auth header) or external API call (has valid API key)
+    const isValidApiKey = apiKey && apiKey === validApiKey;
+    const isInternalCall = authHeader && authHeader.includes(supabaseAnonKey || '');
+    
+    if (!isValidApiKey && !isInternalCall) {
+      console.error('Unauthorized: No valid API key or internal auth');
       return new Response(
         JSON.stringify({ 
           success: false, 
