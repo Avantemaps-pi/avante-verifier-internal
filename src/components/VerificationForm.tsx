@@ -1,10 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { usePiAuth } from "@/contexts/PiAuthContext";
+
+// Get or create a persistent session ID for anonymous users
+function getOrCreateSessionId(): string {
+  const STORAGE_KEY = 'verificationSessionId';
+  let sessionId = localStorage.getItem(STORAGE_KEY);
+  if (!sessionId) {
+    sessionId = `session_${crypto.randomUUID()}`;
+    localStorage.setItem(STORAGE_KEY, sessionId);
+  }
+  return sessionId;
+}
 
 interface VerificationResult {
   verificationId: string;
@@ -27,9 +39,18 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
   const [walletAddress, setWalletAddress] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const { user } = usePiAuth();
   
   // Show logged-in username indicator if available
   const usernameDisplay = piUsername ? `@${piUsername}` : null;
+
+  // Get persistent user identifier: Pi user ID if logged in, otherwise session ID
+  const getExternalUserId = (): string => {
+    if (user?.uid) {
+      return user.uid;
+    }
+    return getOrCreateSessionId();
+  };
 
   const handleVerify = async () => {
     if (!walletAddress.trim()) {
@@ -46,14 +67,14 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
     onVerificationComplete(null);
 
     try {
-      // For demo purposes, use a test external user ID
-      const testExternalUserId = `demo_user_${Date.now()}`;
+      // Use persistent user identifier (Pi user ID or session ID)
+      const externalUserId = getExternalUserId();
       
       const { data, error } = await supabase.functions.invoke('verify-business', {
         body: { 
           walletAddress: walletAddress.trim(),
           businessName: businessName.trim(),
-          externalUserId: testExternalUserId
+          externalUserId
         }
       });
 
