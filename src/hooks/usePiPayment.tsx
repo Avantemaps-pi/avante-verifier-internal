@@ -1,7 +1,19 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { usePiAuth } from '@/contexts/PiAuthContext';
 import type { PiPaymentData, PiPaymentRequest, PiPaymentCallbacks } from '@/types/pi-sdk';
+
+// Get or create a persistent session ID for anonymous users
+function getOrCreateSessionId(): string {
+  const STORAGE_KEY = 'verificationSessionId';
+  let sessionId = localStorage.getItem(STORAGE_KEY);
+  if (!sessionId) {
+    sessionId = `session_${crypto.randomUUID()}`;
+    localStorage.setItem(STORAGE_KEY, sessionId);
+  }
+  return sessionId;
+}
 
 interface PaymentResult {
   success: boolean;
@@ -17,8 +29,17 @@ interface UsePiPaymentOptions {
 }
 
 export const usePiPayment = (options: UsePiPaymentOptions = {}) => {
+  const { user } = usePiAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPayment, setCurrentPayment] = useState<string | null>(null);
+
+  // Get persistent user identifier: Pi user ID if logged in, otherwise session ID
+  const getExternalUserId = useCallback((): string => {
+    if (user?.uid) {
+      return user.uid;
+    }
+    return getOrCreateSessionId();
+  }, [user?.uid]);
 
   const approvePayment = useCallback(async (paymentId: string): Promise<boolean> => {
     try {
@@ -40,8 +61,9 @@ export const usePiPayment = (options: UsePiPaymentOptions = {}) => {
 
   const completePayment = useCallback(async (paymentId: string, txid: string): Promise<boolean> => {
     try {
+      const externalUserId = getExternalUserId();
       const { data, error } = await supabase.functions.invoke('complete-pi-payment', {
-        body: { paymentId, txid },
+        body: { paymentId, txid, externalUserId },
       });
 
       if (error) {
@@ -54,7 +76,7 @@ export const usePiPayment = (options: UsePiPaymentOptions = {}) => {
       console.error('Failed to complete payment:', error);
       return false;
     }
-  }, []);
+  }, [getExternalUserId]);
 
   const createPayment = useCallback(async (
     amount: number,

@@ -1,12 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
 const PI_API_KEY = Deno.env.get('PI_API_KEY');
 const PI_PLATFORM_API = 'https://api.minepi.com';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 interface CompletePaymentRequest {
   paymentId: string;
   txid: string;
+  externalUserId: string;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -26,11 +30,18 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const body: CompletePaymentRequest = await req.json();
-    const { paymentId, txid } = body;
+    const { paymentId, txid, externalUserId } = body;
 
     if (!paymentId || !txid) {
       return new Response(
         JSON.stringify({ success: false, error: 'Payment ID and transaction ID are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!externalUserId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'User ID is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -56,6 +67,25 @@ serve(async (req: Request): Promise<Response> => {
 
     const paymentData = await completeResponse.json();
     console.log('Payment completed:', paymentData);
+
+    // Store payment record in database
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { error: insertError } = await supabase
+      .from('payment_records')
+      .upsert({
+        payment_id: paymentId,
+        external_user_id: externalUserId,
+        amount: paymentData.amount || 0,
+        memo: paymentData.memo || null,
+        status: 'completed',
+        txid: txid,
+      }, { onConflict: 'payment_id' });
+
+    if (insertError) {
+      console.error('Failed to store payment record:', insertError);
+      // Don't fail the request, payment was still successful
+    }
 
     return new Response(
       JSON.stringify({ success: true, payment: paymentData }),

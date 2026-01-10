@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,23 @@ import { Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePiAuth } from "@/contexts/PiAuthContext";
+import { z } from "zod";
+
+// Validation schema for verification form
+const verificationSchema = z.object({
+  businessName: z
+    .string()
+    .trim()
+    .min(1, "Business name is required")
+    .max(200, "Business name must be less than 200 characters")
+    .regex(/^[a-zA-Z0-9\s\-_.&']+$/, "Business name contains invalid characters"),
+  walletAddress: z
+    .string()
+    .trim()
+    .min(1, "Wallet address is required")
+    .length(56, "Pi wallet address must be exactly 56 characters")
+    .regex(/^G[A-Z0-9]{55}$/, "Invalid Pi wallet address format (must start with G)"),
+});
 
 // Get or create a persistent session ID for anonymous users
 function getOrCreateSessionId(): string {
@@ -53,13 +70,15 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
   };
 
   const handleVerify = async () => {
-    if (!walletAddress.trim()) {
-      toast.error("Please enter a wallet address");
-      return;
-    }
+    // Validate inputs with zod
+    const validationResult = verificationSchema.safeParse({
+      businessName,
+      walletAddress,
+    });
 
-    if (!businessName.trim()) {
-      toast.error("Please enter a business name");
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast.error(firstError.message);
       return;
     }
 
@@ -69,11 +88,12 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
     try {
       // Use persistent user identifier (Pi user ID or session ID)
       const externalUserId = getExternalUserId();
+      const validData = validationResult.data;
       
       const { data, error } = await supabase.functions.invoke('verify-business', {
         body: { 
-          walletAddress: walletAddress.trim(),
-          businessName: businessName.trim(),
+          walletAddress: validData.walletAddress,
+          businessName: validData.businessName,
           externalUserId
         }
       });
