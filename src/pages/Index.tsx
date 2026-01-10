@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { VerificationForm } from "@/components/VerificationForm";
 import { VerificationResults } from "@/components/VerificationResults";
+import { PaymentHistory } from "@/components/PaymentHistory";
 import { Button } from "@/components/ui/button";
 import { FileText } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -80,6 +81,11 @@ const Index = () => {
               <VerificationResults {...verificationData} />
             </div>
           )}
+
+          {/* Payment History */}
+          <div className="flex justify-center">
+            <PaymentHistory />
+          </div>
         </div>
       </div>
 
