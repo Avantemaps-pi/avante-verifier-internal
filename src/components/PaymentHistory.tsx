@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Receipt, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, Hash, PieChart } from "lucide-react";
+import { Loader2, Receipt, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight, TrendingUp, Hash, PieChart, Download, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePiAuth } from "@/contexts/PiAuthContext";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Get or create a persistent session ID for anonymous users
 function getOrCreateSessionId(): string {
@@ -45,7 +48,9 @@ const PAGE_SIZE = 10;
 export const PaymentHistory = () => {
   const { user } = usePiAuth();
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [allPayments, setAllPayments] = useState<PaymentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,8 +94,29 @@ export const PaymentHistory = () => {
   const handleToggle = () => {
     if (!hasLoaded) {
       fetchPaymentHistory();
+      fetchAllPaymentsForExport();
     }
     setIsExpanded(!isExpanded);
+  };
+
+  const fetchAllPaymentsForExport = async () => {
+    try {
+      const externalUserId = getExternalUserId();
+      const { data, error } = await supabase.functions.invoke('get-payment-history', {
+        body: { externalUserId, page: 1, pageSize: 1000 },
+      });
+
+      if (error) {
+        console.error('Failed to fetch all payments for export:', error);
+        return;
+      }
+
+      if (data?.success) {
+        setAllPayments(data.data || []);
+      }
+    } catch (error) {
+      console.error('Export fetch error:', error);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -113,6 +139,104 @@ export const PaymentHistory = () => {
         return 'destructive';
       default:
         return 'outline';
+    }
+  };
+
+  const exportToCSV = () => {
+    if (allPayments.length === 0) {
+      toast.error('No payment records to export');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const headers = ['Date', 'Amount (π)', 'Status', 'Memo', 'Payment ID', 'Transaction ID'];
+      const rows = allPayments.map(payment => [
+        formatDate(payment.created_at),
+        payment.amount.toString(),
+        payment.status,
+        payment.memo || '',
+        payment.payment_id,
+        payment.txid || ''
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `payment-history-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Payment history exported to CSV');
+    } catch (error) {
+      console.error('CSV export error:', error);
+      toast.error('Failed to export CSV');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToPDF = () => {
+    if (allPayments.length === 0) {
+      toast.error('No payment records to export');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const doc = new jsPDF();
+      
+      // Title
+      doc.setFontSize(20);
+      doc.text('Payment History', 14, 22);
+      
+      // Summary
+      if (summary) {
+        doc.setFontSize(12);
+        doc.text(`Total Payments: ${summary.totalPayments}`, 14, 35);
+        doc.text(`Total Amount: ${summary.totalAmount.toFixed(2)} π`, 14, 42);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 49);
+      }
+
+      // Table
+      const tableData = allPayments.map(payment => [
+        formatDate(payment.created_at),
+        `${payment.amount} π`,
+        payment.status,
+        payment.memo || '-',
+        payment.txid ? payment.txid.substring(0, 12) + '...' : '-'
+      ]);
+
+      autoTable(doc, {
+        startY: summary ? 58 : 35,
+        head: [['Date', 'Amount', 'Status', 'Memo', 'Transaction ID']],
+        body: tableData,
+        headStyles: { fillColor: [139, 92, 246] }, // Purple color
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 45 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 50 },
+          4: { cellWidth: 35 }
+        }
+      });
+
+      doc.save(`payment-history-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('Payment history exported to PDF');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Failed to export PDF');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -189,6 +313,40 @@ export const PaymentHistory = () => {
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Export Buttons */}
+              {allPayments.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportToCSV}
+                    disabled={isExporting}
+                    className="flex-1"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Export CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportToPDF}
+                    disabled={isExporting}
+                    className="flex-1"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <FileText className="h-4 w-4 mr-2" />
+                    )}
+                    Export PDF
+                  </Button>
                 </div>
               )}
               
