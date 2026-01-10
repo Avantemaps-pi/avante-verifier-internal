@@ -7,6 +7,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 interface GetPaymentHistoryRequest {
   externalUserId: string;
+  page?: number;
+  pageSize?: number;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -25,7 +27,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const body: GetPaymentHistoryRequest = await req.json();
-    const { externalUserId } = body;
+    const { externalUserId, page = 1, pageSize = 10 } = body;
 
     if (!externalUserId) {
       return new Response(
@@ -36,12 +38,31 @@ serve(async (req: Request): Promise<Response> => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Get total count for pagination
+    const { count, error: countError } = await supabase
+      .from('payment_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('external_user_id', externalUserId);
+
+    if (countError) {
+      console.error('Failed to count payment records:', countError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to fetch payment history' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Calculate pagination
+    const totalRecords = count || 0;
+    const totalPages = Math.ceil(totalRecords / pageSize);
+    const offset = (page - 1) * pageSize;
+
     const { data, error } = await supabase
       .from('payment_records')
       .select('id, payment_id, amount, memo, status, txid, created_at')
       .eq('external_user_id', externalUserId)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .range(offset, offset + pageSize - 1);
 
     if (error) {
       console.error('Failed to fetch payment history:', error);
@@ -52,7 +73,16 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: data || [] }),
+      JSON.stringify({ 
+        success: true, 
+        data: data || [],
+        pagination: {
+          page,
+          pageSize,
+          totalRecords,
+          totalPages,
+        }
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

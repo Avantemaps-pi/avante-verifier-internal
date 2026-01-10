@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Receipt, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Loader2, Receipt, ChevronDown, ChevronUp, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePiAuth } from "@/contexts/PiAuthContext";
 
@@ -27,12 +27,23 @@ interface PaymentRecord {
   created_at: string;
 }
 
+interface PaginationInfo {
+  page: number;
+  pageSize: number;
+  totalRecords: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 10;
+
 export const PaymentHistory = () => {
   const { user } = usePiAuth();
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
 
   const getExternalUserId = (): string => {
     if (user?.uid) {
@@ -41,12 +52,12 @@ export const PaymentHistory = () => {
     return getOrCreateSessionId();
   };
 
-  const fetchPaymentHistory = async () => {
+  const fetchPaymentHistory = async (page: number = 1) => {
     setIsLoading(true);
     try {
       const externalUserId = getExternalUserId();
       const { data, error } = await supabase.functions.invoke('get-payment-history', {
-        body: { externalUserId },
+        body: { externalUserId, page, pageSize: PAGE_SIZE },
       });
 
       if (error) {
@@ -56,6 +67,8 @@ export const PaymentHistory = () => {
 
       if (data?.success) {
         setPayments(data.data || []);
+        setPagination(data.pagination || null);
+        setCurrentPage(page);
       }
     } catch (error) {
       console.error('Payment history error:', error);
@@ -173,10 +186,39 @@ export const PaymentHistory = () => {
                 </div>
               ))}
               
+              {/* Pagination Controls */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-border/30">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {pagination.totalPages} ({pagination.totalRecords} records)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchPaymentHistory(currentPage - 1)}
+                      disabled={isLoading || currentPage <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="sr-only">Previous</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchPaymentHistory(currentPage + 1)}
+                      disabled={isLoading || currentPage >= pagination.totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                      <span className="sr-only">Next</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={fetchPaymentHistory}
+                onClick={() => fetchPaymentHistory(currentPage)}
                 className="w-full mt-2"
                 disabled={isLoading}
               >
