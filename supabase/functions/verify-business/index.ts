@@ -59,15 +59,70 @@ interface WebhookPayload {
 
 import { generateSignature } from '../_shared/webhook-validation.ts';
 
+interface WebhookDeliveryLog {
+  deliveryId: string;
+  verificationId?: string;
+  webhookUrl: string;
+  payload: WebhookPayload;
+  status: 'pending' | 'success' | 'failed';
+  statusCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  attemptNumber: number;
+}
+
+// Log webhook delivery to database
+async function logWebhookDelivery(
+  supabase: any,
+  log: WebhookDeliveryLog
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('webhook_delivery_logs')
+      .upsert({
+        delivery_id: log.deliveryId,
+        verification_id: log.verificationId,
+        webhook_url: log.webhookUrl,
+        payload: log.payload,
+        status: log.status,
+        status_code: log.statusCode,
+        response_body: log.responseBody?.substring(0, 1000), // Limit response body size
+        error_message: log.errorMessage,
+        attempt_number: log.attemptNumber,
+        completed_at: log.status !== 'pending' ? new Date().toISOString() : null,
+      }, { onConflict: 'delivery_id' });
+    
+    if (error) {
+      console.error('Failed to log webhook delivery:', error);
+    }
+  } catch (err) {
+    console.error('Error logging webhook delivery:', err);
+  }
+}
+
 // Send webhook notification (runs as background task)
 async function sendWebhookNotification(
   webhookUrl: string,
   payload: WebhookPayload,
-  webhookSecret?: string
+  webhookSecret?: string,
+  supabase?: any
 ): Promise<void> {
   const maxRetries = 3;
   const retryDelays = [0, 1000, 5000]; // immediate, 1s, 5s
   const deliveryId = crypto.randomUUID();
+  const verificationId = payload.data?.verificationId;
+  
+  // Log initial pending state
+  if (supabase) {
+    await logWebhookDelivery(supabase, {
+      deliveryId,
+      verificationId,
+      webhookUrl,
+      payload,
+      status: 'pending',
+      attemptNumber: 1,
+    });
+  }
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -104,8 +159,22 @@ async function sendWebhookNotification(
       
       clearTimeout(timeoutId);
       
+      const responseBody = await response.text().catch(() => '');
+      
       if (response.ok) {
         console.log(`Webhook notification sent successfully (status: ${response.status})`);
+        if (supabase) {
+          await logWebhookDelivery(supabase, {
+            deliveryId,
+            verificationId,
+            webhookUrl,
+            payload,
+            status: 'success',
+            statusCode: response.status,
+            responseBody,
+            attemptNumber: attempt + 1,
+          });
+        }
         return;
       }
       
@@ -114,10 +183,37 @@ async function sendWebhookNotification(
       // Don't retry on client errors (4xx) except 429
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
         console.error(`Webhook failed with client error, not retrying`);
+        if (supabase) {
+          await logWebhookDelivery(supabase, {
+            deliveryId,
+            verificationId,
+            webhookUrl,
+            payload,
+            status: 'failed',
+            statusCode: response.status,
+            responseBody,
+            errorMessage: `Client error: ${response.status} ${response.statusText}`,
+            attemptNumber: attempt + 1,
+          });
+        }
         return;
       }
     } catch (error) {
-      console.error(`Webhook attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Webhook attempt ${attempt + 1} failed:`, errorMessage);
+      
+      // Log failure on last attempt
+      if (attempt === maxRetries - 1 && supabase) {
+        await logWebhookDelivery(supabase, {
+          deliveryId,
+          verificationId,
+          webhookUrl,
+          payload,
+          status: 'failed',
+          errorMessage: `All retries exhausted. Last error: ${errorMessage}`,
+          attemptNumber: attempt + 1,
+        });
+      }
     }
   }
   
@@ -553,9 +649,9 @@ serve(async (req) => {
         },
       };
       
-      // Use EdgeRuntime.waitUntil for background task
-      (globalThis as any).EdgeRuntime?.waitUntil?.(sendWebhookNotification(webhookUrl, webhookPayload, webhookSecret)) 
-        ?? sendWebhookNotification(webhookUrl, webhookPayload, webhookSecret);
+      // Use EdgeRuntime.waitUntil for background task with logging
+      (globalThis as any).EdgeRuntime?.waitUntil?.(sendWebhookNotification(webhookUrl, webhookPayload, webhookSecret, supabase)) 
+        ?? sendWebhookNotification(webhookUrl, webhookPayload, webhookSecret, supabase);
       webhookQueued = true;
       console.log('Webhook notification queued for background delivery');
     }
