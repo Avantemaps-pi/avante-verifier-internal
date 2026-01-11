@@ -299,6 +299,8 @@ async function processWithConcurrency<T, R>(
   return results;
 }
 
+import { generateSignature } from '../_shared/webhook-validation.ts';
+
 // Send webhook notification
 async function sendWebhookNotification(
   webhookUrl: string,
@@ -307,6 +309,8 @@ async function sendWebhookNotification(
 ): Promise<void> {
   const maxRetries = 3;
   const retryDelays = [0, 1000, 5000];
+  const deliveryId = crypto.randomUUID();
+  const timestamp = new Date().toISOString();
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -314,30 +318,18 @@ async function sendWebhookNotification(
         await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
       }
       
+      const payloadString = JSON.stringify(payload);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'User-Agent': 'Avante-Business-Verifier/1.0',
         'X-Webhook-Event': 'batch.verification.completed',
-        'X-Webhook-Timestamp': new Date().toISOString(),
+        'X-Webhook-Timestamp': timestamp,
+        'X-Webhook-Delivery': deliveryId,
       };
       
+      // Add HMAC-SHA256 signature if secret provided
       if (webhookSecret) {
-        const encoder = new TextEncoder();
-        const key = await crypto.subtle.importKey(
-          'raw',
-          encoder.encode(webhookSecret),
-          { name: 'HMAC', hash: 'SHA-256' },
-          false,
-          ['sign']
-        );
-        const signature = await crypto.subtle.sign(
-          'HMAC',
-          key,
-          encoder.encode(JSON.stringify(payload))
-        );
-        const signatureHex = Array.from(new Uint8Array(signature))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
+        const signatureHex = await generateSignature(payloadString, webhookSecret);
         headers['X-Webhook-Signature'] = `sha256=${signatureHex}`;
       }
       

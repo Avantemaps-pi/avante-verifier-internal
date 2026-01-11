@@ -57,6 +57,8 @@ interface WebhookPayload {
   };
 }
 
+import { generateSignature } from '../_shared/webhook-validation.ts';
+
 // Send webhook notification (runs as background task)
 async function sendWebhookNotification(
   webhookUrl: string,
@@ -65,6 +67,7 @@ async function sendWebhookNotification(
 ): Promise<void> {
   const maxRetries = 3;
   const retryDelays = [0, 1000, 5000]; // immediate, 1s, 5s
+  const deliveryId = crypto.randomUUID();
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -72,33 +75,20 @@ async function sendWebhookNotification(
         await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
       }
       
-      console.log(`Sending webhook notification (attempt ${attempt + 1}/${maxRetries}) to: ${webhookUrl}`);
+      console.log(`Sending webhook notification (attempt ${attempt + 1}/${maxRetries}) to: ${webhookUrl}, deliveryId: ${deliveryId}`);
       
+      const payloadString = JSON.stringify(payload);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'User-Agent': 'Avante-Business-Verifier/1.0',
         'X-Webhook-Event': payload.event,
         'X-Webhook-Timestamp': payload.timestamp,
+        'X-Webhook-Delivery': deliveryId,
       };
       
-      // Add signature if secret provided
+      // Add HMAC-SHA256 signature if secret provided
       if (webhookSecret) {
-        const encoder = new TextEncoder();
-        const key = await crypto.subtle.importKey(
-          'raw',
-          encoder.encode(webhookSecret),
-          { name: 'HMAC', hash: 'SHA-256' },
-          false,
-          ['sign']
-        );
-        const signature = await crypto.subtle.sign(
-          'HMAC',
-          key,
-          encoder.encode(JSON.stringify(payload))
-        );
-        const signatureHex = Array.from(new Uint8Array(signature))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
+        const signatureHex = await generateSignature(payloadString, webhookSecret);
         headers['X-Webhook-Signature'] = `sha256=${signatureHex}`;
       }
       
