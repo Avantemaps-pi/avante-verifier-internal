@@ -1,13 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { VerificationForm } from "@/components/VerificationForm";
 import { VerificationResults } from "@/components/VerificationResults";
 import { PaymentHistory } from "@/components/PaymentHistory";
-import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { PiLoginButton } from "@/components/PiLoginButton";
-import { MobileNav } from "@/components/MobileNav";
+import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { usePiAuth } from "@/contexts/PiAuthContext";
 
@@ -34,26 +29,8 @@ const Index = () => {
       <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-destructive/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Bar - Left */}
-      <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-        <PiLoginButton />
-      </div>
-
-      {/* Top Bar - Right */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        {/* Desktop Navigation */}
-        <div className="hidden sm:flex items-center gap-2">
-          <ThemeToggle />
-          <Link to="/docs">
-            <Button variant="outline" size="sm" className="gap-2">
-              <FileText className="h-4 w-4" />
-              API Docs
-            </Button>
-          </Link>
-        </div>
-        {/* Mobile Navigation */}
-        <MobileNav />
-      </div>
+      {/* Header */}
+      <Header />
 
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-4">
