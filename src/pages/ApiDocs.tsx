@@ -22,8 +22,9 @@ const Section = ({ title, id, children }: { title: string; id: string; children:
 );
 
 const ApiDocs = () => {
-  const baseUrl = "https://cknlxuespsymlvtwkeqh.supabase.co/functions/v1/verify-business";
-  const batchUrl = "https://cknlxuespsymlvtwkeqh.supabase.co/functions/v1/verify-business-batch";
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const baseUrl = `${supabaseUrl}/functions/v1/verify-business`;
+  const batchUrl = `${supabaseUrl}/functions/v1/verify-business-batch`;
 
   const basicExample = `curl -X POST "${baseUrl}" \\
   -H "Content-Type: application/json" \\
