@@ -77,14 +77,14 @@ export function useSubscription() {
           expires_at: data.data.expires_at || null,
         });
       } else {
-        // No subscription found, user is on free tier
+        // No subscription found, default to enterprise tier
         setSubscription({
           id: '',
           external_user_id: externalUserId,
-          tier: 'free',
+          tier: 'enterprise',
           billing_period: null,
           verifications_used: 0,
-          verifications_limit: 1,
+          verifications_limit: 999999,
           started_at: new Date().toISOString(),
           expires_at: null,
         });
