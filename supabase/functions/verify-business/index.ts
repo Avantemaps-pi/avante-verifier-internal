@@ -266,10 +266,20 @@ serve(async (req) => {
     const validApiKey = Deno.env.get('PI_API_KEY');
     const authHeader = req.headers.get('authorization');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const apiKeyHeader = req.headers.get('apikey');
     
-    // Check if this is an internal call (has valid Supabase auth header) or external API call (has valid API key)
+    // Check if this is an internal call (has valid Supabase auth header or apikey header) or external API call (has valid API key)
     const isValidApiKey = apiKey && apiKey === validApiKey;
-    const isInternalCall = authHeader && authHeader.includes(supabaseAnonKey || '');
+    const isInternalCall = (authHeader && supabaseAnonKey && authHeader.includes(supabaseAnonKey)) || 
+                           (apiKeyHeader && apiKeyHeader === supabaseAnonKey);
+    
+    console.log('Auth check:', { 
+      hasApiKey: !!apiKey, 
+      isValidApiKey, 
+      hasAuthHeader: !!authHeader, 
+      hasApiKeyHeader: !!apiKeyHeader,
+      isInternalCall 
+    });
     
     if (!isValidApiKey && !isInternalCall) {
       console.error('Unauthorized: No valid API key or internal auth');
