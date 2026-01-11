@@ -51,18 +51,31 @@ export function useSubscription() {
     try {
       const externalUserId = getExternalUserId();
       
-      const { data, error: fetchError } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('external_user_id', externalUserId)
-        .maybeSingle();
+      // Use edge function instead of direct database query for security
+      const { data, error: fnError } = await supabase.functions.invoke('get-subscription-status', {
+        body: { externalUserId, includeFullSubscription: true }
+      });
 
-      if (fetchError) {
-        throw fetchError;
+      if (fnError) {
+        throw fnError;
       }
 
-      if (data) {
-        setSubscription(data as unknown as Subscription);
+      if (data?.success && data?.subscription) {
+        setSubscription(data.subscription as Subscription);
+      } else if (data?.success && data?.data) {
+        // Fallback to allowance data if full subscription not returned
+        setSubscription({
+          id: '',
+          external_user_id: externalUserId,
+          tier: data.data.tier || 'free',
+          billing_period: null,
+          verifications_used: data.data.remaining !== undefined 
+            ? (tierConfig[data.data.tier as keyof typeof tierConfig]?.limit || 1) - data.data.remaining
+            : 0,
+          verifications_limit: tierConfig[data.data.tier as keyof typeof tierConfig]?.limit || 1,
+          started_at: new Date().toISOString(),
+          expires_at: data.data.expires_at || null,
+        });
       } else {
         // No subscription found, user is on free tier
         setSubscription({
