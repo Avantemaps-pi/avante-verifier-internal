@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FileText, Receipt } from "lucide-react";
+import { FileText, Receipt, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PiLoginButton } from "@/components/PiLoginButton";
 import { MobileNav } from "@/components/MobileNav";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { PaymentHistory } from "@/components/PaymentHistory";
 import { Badge } from "@/components/ui/badge";
 import { usePaymentCount } from "@/hooks/usePaymentCount";
@@ -63,9 +63,19 @@ export const Header = () => {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-                <div className="pt-6">
-                  <PaymentHistory />
-                </div>
+                <SheetHeader className="flex flex-row items-center justify-between border-b pb-4 mb-4">
+                  <SheetTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <Receipt className="h-5 w-5 text-primary" />
+                    Payment History
+                  </SheetTitle>
+                  <SheetClose asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <X className="h-4 w-4" />
+                      <span className="sr-only">Close</span>
+                    </Button>
+                  </SheetClose>
+                </SheetHeader>
+                <PaymentHistory />
               </SheetContent>
             </Sheet>
             <ThemeToggle />
