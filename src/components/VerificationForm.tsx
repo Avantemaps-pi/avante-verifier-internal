@@ -21,7 +21,8 @@ const verificationSchema = z.object({
     .trim()
     .min(1, "Wallet address is required")
     .length(56, "Pi wallet address must be exactly 56 characters")
-    .regex(/^G[A-Z0-9]{55}$/, "Invalid Pi wallet address format (must start with G)"),
+    // Stellar-style addresses are base32: A-Z and 2-7 (no 0/1/8/9)
+    .regex(/^G[A-Z2-7]{55}$/, "Invalid Pi wallet address format (A-Z and 2-7 only, must start with G)"),
 });
 
 // Get or create a persistent session ID for anonymous users
@@ -112,7 +113,21 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
       }
     } catch (error) {
       console.error('Verification error:', error);
-      toast.error("Failed to verify business. Please try again.");
+
+      const maybeBody = (error as any)?.context?.body;
+      if (typeof maybeBody === 'string') {
+        try {
+          const parsed = JSON.parse(maybeBody);
+          if (parsed?.error) {
+            toast.error(parsed.error);
+            return;
+          }
+        } catch {
+          // ignore JSON parse failures
+        }
+      }
+
+      toast.error((error as any)?.message || "Failed to verify business. Please try again.");
     } finally {
       setIsVerifying(false);
     }
