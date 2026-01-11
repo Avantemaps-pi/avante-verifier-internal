@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2, Shield, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePiAuth } from "@/contexts/PiAuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import { z } from "zod";
 
 // Validation schema for verification form
@@ -57,7 +58,9 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
   const [walletAddress, setWalletAddress] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const { user } = usePiAuth();
+  const { checkVerificationAllowance, refetch: refetchSubscription, subscription } = useSubscription();
   
   // Show logged-in username indicator if available
   const usernameDisplay = piUsername ? `@${piUsername}` : null;
@@ -83,6 +86,17 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
       return;
     }
 
+    // Check verification allowance before proceeding
+    const allowance = await checkVerificationAllowance();
+    if (!allowance?.allowed) {
+      setQuotaExceeded(true);
+      toast.error("Verification limit reached", {
+        description: `Your ${allowance?.tier || 'free'} plan has no remaining verifications. Please upgrade to continue.`,
+      });
+      return;
+    }
+
+    setQuotaExceeded(false);
     setIsVerifying(true);
     onVerificationComplete(null);
 
@@ -108,6 +122,8 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
           toast.error(`Verification failed: ${data.data.failureReason}`);
         }
         onVerificationComplete(data.data);
+        // Refresh subscription to update usage count
+        refetchSubscription();
       } else {
         toast.error(data.error || "Verification failed");
       }
@@ -182,6 +198,27 @@ export const VerificationForm = ({ onVerificationComplete, piUsername }: Verific
             disabled={isVerifying}
           />
         </div>
+
+        {/* Quota Exceeded Warning */}
+        {quotaExceeded && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>
+              Verification limit reached for your {subscription?.tier || 'free'} plan.{' '}
+              <button
+                onClick={() => {
+                  const pricingSection = document.getElementById('features');
+                  if (pricingSection) {
+                    pricingSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="underline font-medium hover:text-destructive/80"
+              >
+                Upgrade now
+              </button>
+            </span>
+          </div>
+        )}
 
         <Button
           onClick={handleVerify}

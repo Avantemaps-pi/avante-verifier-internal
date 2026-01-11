@@ -87,6 +87,60 @@ serve(async (req: Request): Promise<Response> => {
       // Don't fail the request, payment was still successful
     }
 
+    // Parse subscription info from memo
+    const memo = paymentData.memo || '';
+    const isSubscription = memo.includes('Verification Plan');
+    
+    if (isSubscription) {
+      // Determine tier and billing period from memo
+      let tier: 'basic' | 'professional' | 'enterprise' = 'basic';
+      let billingPeriod: 'monthly' | 'annual' = 'monthly';
+      let verificationsLimit = 5;
+      
+      if (memo.includes('Basic')) {
+        tier = 'basic';
+        verificationsLimit = 5;
+      } else if (memo.includes('Professional')) {
+        tier = 'professional';
+        verificationsLimit = 50;
+      } else if (memo.includes('Enterprise')) {
+        tier = 'enterprise';
+        verificationsLimit = 999999; // Unlimited
+      }
+      
+      if (memo.includes('Annual')) {
+        billingPeriod = 'annual';
+      }
+      
+      // Calculate expiration date
+      const expiresAt = new Date();
+      if (billingPeriod === 'annual') {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      } else {
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+      }
+      
+      // Upsert subscription record
+      const { error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .upsert({
+          external_user_id: externalUserId,
+          tier: tier,
+          billing_period: billingPeriod,
+          verifications_limit: verificationsLimit,
+          verifications_used: 0,
+          started_at: new Date().toISOString(),
+          expires_at: expiresAt.toISOString(),
+          payment_id: paymentId,
+        }, { onConflict: 'external_user_id' });
+
+      if (subscriptionError) {
+        console.error('Failed to update subscription:', subscriptionError);
+      } else {
+        console.log('Subscription updated:', { tier, billingPeriod, verificationsLimit });
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, payment: paymentData }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

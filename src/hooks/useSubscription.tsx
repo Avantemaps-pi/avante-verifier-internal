@@ -1,0 +1,129 @@
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { usePiAuth } from "@/contexts/PiAuthContext";
+
+interface Subscription {
+  id: string;
+  external_user_id: string;
+  tier: "free" | "basic" | "professional" | "enterprise";
+  billing_period: "monthly" | "annual" | null;
+  verifications_used: number;
+  verifications_limit: number;
+  started_at: string;
+  expires_at: string | null;
+}
+
+interface VerificationAllowance {
+  allowed: boolean;
+  remaining: number;
+  tier: "free" | "basic" | "professional" | "enterprise";
+  expires_at: string | null;
+}
+
+// Get or create a persistent session ID for anonymous users
+function getOrCreateSessionId(): string {
+  const STORAGE_KEY = 'verificationSessionId';
+  let sessionId = localStorage.getItem(STORAGE_KEY);
+  if (!sessionId) {
+    sessionId = `session_${crypto.randomUUID()}`;
+    localStorage.setItem(STORAGE_KEY, sessionId);
+  }
+  return sessionId;
+}
+
+export function useSubscription() {
+  const { user } = usePiAuth();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const getExternalUserId = useCallback((): string => {
+    if (user?.uid) {
+      return user.uid;
+    }
+    return getOrCreateSessionId();
+  }, [user?.uid]);
+
+  const fetchSubscription = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const externalUserId = getExternalUserId();
+      
+      const { data, error: fetchError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('external_user_id', externalUserId)
+        .maybeSingle();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (data) {
+        setSubscription(data as unknown as Subscription);
+      } else {
+        // No subscription found, user is on free tier
+        setSubscription({
+          id: '',
+          external_user_id: externalUserId,
+          tier: 'free',
+          billing_period: null,
+          verifications_used: 0,
+          verifications_limit: 1,
+          started_at: new Date().toISOString(),
+          expires_at: null,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching subscription:', err);
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getExternalUserId]);
+
+  const checkVerificationAllowance = useCallback(async (): Promise<VerificationAllowance | null> => {
+    try {
+      const externalUserId = getExternalUserId();
+      
+      const { data, error: rpcError } = await supabase
+        .rpc('check_verification_allowance', { p_external_user_id: externalUserId });
+
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      if (data && data.length > 0) {
+        return data[0] as VerificationAllowance;
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Error checking verification allowance:', err);
+      return null;
+    }
+  }, [getExternalUserId]);
+
+  useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]);
+
+  const tierConfig = {
+    free: { name: 'Free', limit: 1, color: 'text-muted-foreground' },
+    basic: { name: 'Basic', limit: 5, color: 'text-blue-500' },
+    professional: { name: 'Professional', limit: 50, color: 'text-purple-500' },
+    enterprise: { name: 'Enterprise', limit: Infinity, color: 'text-amber-500' },
+  };
+
+  return {
+    subscription,
+    isLoading,
+    error,
+    refetch: fetchSubscription,
+    checkVerificationAllowance,
+    tierConfig,
+    getExternalUserId,
+  };
+}

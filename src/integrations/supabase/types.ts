@@ -92,6 +92,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_subscriptions: {
+        Row: {
+          billing_period: Database["public"]["Enums"]["billing_period"] | null
+          created_at: string
+          expires_at: string | null
+          external_user_id: string
+          id: string
+          payment_id: string | null
+          started_at: string
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+          verifications_limit: number
+          verifications_used: number
+        }
+        Insert: {
+          billing_period?: Database["public"]["Enums"]["billing_period"] | null
+          created_at?: string
+          expires_at?: string | null
+          external_user_id: string
+          id?: string
+          payment_id?: string | null
+          started_at?: string
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          verifications_limit?: number
+          verifications_used?: number
+        }
+        Update: {
+          billing_period?: Database["public"]["Enums"]["billing_period"] | null
+          created_at?: string
+          expires_at?: string | null
+          external_user_id?: string
+          id?: string
+          payment_id?: string | null
+          started_at?: string
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          verifications_limit?: number
+          verifications_used?: number
+        }
+        Relationships: []
+      }
       verification_rate_limits: {
         Row: {
           created_at: string
@@ -136,8 +178,23 @@ export type Database = {
           reset_at: string
         }[]
       }
+      check_verification_allowance: {
+        Args: { p_external_user_id: string }
+        Returns: {
+          allowed: boolean
+          expires_at: string
+          remaining: number
+          tier: Database["public"]["Enums"]["subscription_tier"]
+        }[]
+      }
+      increment_verification_usage: {
+        Args: { p_external_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
+      billing_period: "monthly" | "annual"
+      subscription_tier: "free" | "basic" | "professional" | "enterprise"
       verification_status: "approved" | "rejected" | "under_review"
     }
     CompositeTypes: {
@@ -266,6 +323,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      billing_period: ["monthly", "annual"],
+      subscription_tier: ["free", "basic", "professional", "enterprise"],
       verification_status: ["approved", "rejected", "under_review"],
     },
   },

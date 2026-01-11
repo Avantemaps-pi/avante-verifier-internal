@@ -515,6 +515,17 @@ serve(async (req) => {
 
     console.log('Verification saved successfully:', dbData);
 
+    // Increment verification usage for the user's subscription
+    const { error: usageError } = await supabase
+      .rpc('increment_verification_usage', { p_external_user_id: externalUserId.trim() });
+    
+    if (usageError) {
+      console.error('Failed to increment verification usage:', usageError);
+      // Don't fail the request, just log the error
+    } else {
+      console.log('Verification usage incremented for user:', externalUserId);
+    }
+
     const cacheExpiresAt = new Date(Date.now() + CACHE_DURATION_MS).toISOString();
 
     // Queue webhook notification as background task if URL provided
