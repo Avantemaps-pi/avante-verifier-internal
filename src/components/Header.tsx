@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
+import { FileText, Receipt } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PiLoginButton } from "@/components/PiLoginButton";
 import { MobileNav } from "@/components/MobileNav";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { PaymentHistory } from "@/components/PaymentHistory";
 
 export const Header = () => {
   return (
@@ -23,6 +25,20 @@ export const Header = () => {
         <div className="flex items-center gap-2">
           {/* Desktop Navigation */}
           <div className="hidden sm:flex items-center gap-2">
+            {/* Payment History Sheet */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Receipt className="h-4 w-4" />
+                  Payment History
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+                <div className="pt-6">
+                  <PaymentHistory />
+                </div>
+              </SheetContent>
+            </Sheet>
             <ThemeToggle />
             <Link to="/docs">
               <Button variant="outline" size="sm" className="gap-2">
