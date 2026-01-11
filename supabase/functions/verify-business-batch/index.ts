@@ -385,11 +385,25 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate API key
+    // Timing-safe comparison for secrets
+    function timingSafeEqual(a: string, b: string): boolean {
+      if (a.length !== b.length) return false;
+      const encoder = new TextEncoder();
+      const bufA = encoder.encode(a);
+      const bufB = encoder.encode(b);
+      
+      let result = 0;
+      for (let i = 0; i < bufA.length; i++) {
+        result |= bufA[i] ^ bufB[i];
+      }
+      return result === 0;
+    }
+
+    // Validate API key using timing-safe comparison
     const apiKey = req.headers.get('x-api-key');
     const expectedApiKey = Deno.env.get('PI_API_KEY');
     
-    if (!apiKey || apiKey !== expectedApiKey) {
+    if (!apiKey || !expectedApiKey || !timingSafeEqual(apiKey, expectedApiKey)) {
       return new Response(
         JSON.stringify({ success: false, error: 'Unauthorized: Invalid or missing API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
