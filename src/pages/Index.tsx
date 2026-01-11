@@ -2,10 +2,10 @@ import { useState } from "react";
 import { VerificationForm } from "@/components/VerificationForm";
 import { VerificationResults } from "@/components/VerificationResults";
 import { PaymentHistory } from "@/components/PaymentHistory";
+import { PricingTable } from "@/components/PricingTable";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { usePiAuth } from "@/contexts/PiAuthContext";
-
 interface VerificationData {
   verificationId: string;
   walletAddress: string;
@@ -62,6 +62,9 @@ const Index = () => {
               <VerificationResults {...verificationData} />
             </div>
           )}
+
+          {/* Pricing Table */}
+          <PricingTable />
 
           {/* Payment History */}
           <div className="flex justify-center">
