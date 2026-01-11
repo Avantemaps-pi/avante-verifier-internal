@@ -15,8 +15,9 @@ export function getCorsHeaders(req: Request): Record<string, string> {
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    // Keep credentials enabled for in-browser calls that include auth headers.
-    'Access-Control-Allow-Credentials': 'true',
+    // Note: Access-Control-Allow-Credentials removed intentionally.
+    // This API uses x-api-key headers (not cookies) for authentication,
+    // so credentials support is not needed and would be dangerous with origin reflection.
   };
 }
 

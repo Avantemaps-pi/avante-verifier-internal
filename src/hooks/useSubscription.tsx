@@ -88,15 +88,17 @@ export function useSubscription() {
     try {
       const externalUserId = getExternalUserId();
       
-      const { data, error: rpcError } = await supabase
-        .rpc('check_verification_allowance', { p_external_user_id: externalUserId });
+      // Call edge function instead of direct RPC (RPC is now restricted to service_role)
+      const { data, error: fnError } = await supabase.functions.invoke('get-subscription-status', {
+        body: { externalUserId }
+      });
 
-      if (rpcError) {
-        throw rpcError;
+      if (fnError) {
+        throw fnError;
       }
 
-      if (data && data.length > 0) {
-        return data[0] as VerificationAllowance;
+      if (data?.success && data?.data) {
+        return data.data as VerificationAllowance;
       }
 
       return null;
