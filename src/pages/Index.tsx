@@ -65,8 +65,8 @@ const Index = () => {
             </div>
           )}
 
-          {/* Pricing Table */}
-          <PricingTable />
+          {/* Pricing Table - Hidden since all users are enterprise tier */}
+          {/* <PricingTable /> */}
 
           {/* Payment History */}
           <div className="flex justify-center">
