@@ -261,6 +261,20 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Timing-safe comparison for secrets
+    function timingSafeEqual(a: string, b: string): boolean {
+      if (a.length !== b.length) return false;
+      const encoder = new TextEncoder();
+      const bufA = encoder.encode(a);
+      const bufB = encoder.encode(b);
+      
+      let result = 0;
+      for (let i = 0; i < bufA.length; i++) {
+        result |= bufA[i] ^ bufB[i];
+      }
+      return result === 0;
+    }
+
     // Authentication: Accept either API key (for external API access) or Supabase auth header (for internal frontend calls)
     const apiKey = req.headers.get('x-api-key');
     const validApiKey = Deno.env.get('PI_API_KEY');
@@ -269,9 +283,10 @@ serve(async (req) => {
     const apiKeyHeader = req.headers.get('apikey');
     
     // Check if this is an internal call (has valid Supabase auth header or apikey header) or external API call (has valid API key)
-    const isValidApiKey = apiKey && apiKey === validApiKey;
+    // Use timing-safe comparison for API key to prevent timing attacks
+    const isValidApiKey = apiKey && validApiKey && timingSafeEqual(apiKey, validApiKey);
     const isInternalCall = (authHeader && supabaseAnonKey && authHeader.includes(supabaseAnonKey)) || 
-                           (apiKeyHeader && apiKeyHeader === supabaseAnonKey);
+                           (apiKeyHeader && supabaseAnonKey && timingSafeEqual(apiKeyHeader, supabaseAnonKey));
     
     console.log('Auth check:', { 
       hasApiKey: !!apiKey, 
