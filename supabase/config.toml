@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.complete-pi-payment]
 verify_jwt = false
+
+[functions.get-subscription-status]
+verify_jwt = false
+
+[functions.get-payment-history]
+verify_jwt = false
