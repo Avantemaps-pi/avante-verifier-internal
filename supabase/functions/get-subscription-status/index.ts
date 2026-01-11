@@ -4,6 +4,18 @@ import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
 interface GetSubscriptionRequest {
   externalUserId: string;
+  includeFullSubscription?: boolean;
+}
+
+interface SubscriptionData {
+  id: string;
+  external_user_id: string;
+  tier: string;
+  billing_period: string | null;
+  verifications_used: number;
+  verifications_limit: number;
+  started_at: string;
+  expires_at: string | null;
 }
 
 interface SubscriptionResponse {
@@ -14,6 +26,7 @@ interface SubscriptionResponse {
     tier: string;
     expires_at: string | null;
   };
+  subscription?: SubscriptionData;
   error?: string;
 }
 
@@ -92,6 +105,19 @@ serve(async (req: Request): Promise<Response> => {
         expires_at: result.expires_at
       }
     };
+
+    // If full subscription data requested, fetch it
+    if (body.includeFullSubscription) {
+      const { data: subData, error: subError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('external_user_id', externalUserId)
+        .maybeSingle();
+
+      if (!subError && subData) {
+        response.subscription = subData as SubscriptionData;
+      }
+    }
 
     return new Response(
       JSON.stringify(response),

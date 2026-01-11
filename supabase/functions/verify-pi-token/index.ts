@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCorsPreflightRequest } from '../_shared/cors.ts';
 
 // Pi Platform API endpoint for token verification
@@ -39,6 +40,48 @@ serve(async (req: Request): Promise<Response> => {
         JSON.stringify({ success: false, error: 'Method not allowed' }),
         { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Verify request is from a trusted source (internal frontend)
+    // Check for Supabase anon key in authorization header
+    const authHeader = req.headers.get('authorization');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!authHeader || !supabaseAnonKey || !authHeader.includes(supabaseAnonKey)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Apply rate limiting per client IP
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (supabaseUrl && supabaseServiceKey) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      // Rate limit: 10 token verifications per hour per IP
+      const { data: rateLimitData, error: rateLimitError } = await supabase.rpc('check_rate_limit', {
+        p_wallet_address: `verify_token_${clientIP}`,
+        p_max_requests: 10,
+        p_window_hours: 1
+      });
+
+      if (!rateLimitError && rateLimitData?.[0] && !rateLimitData[0].allowed) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Rate limit exceeded. Please try again later.',
+            reset_at: rateLimitData[0].reset_at
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const body: VerifyTokenRequest = await req.json();
