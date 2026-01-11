@@ -161,6 +161,59 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_delivery_logs: {
+        Row: {
+          attempt_number: number
+          completed_at: string | null
+          created_at: string
+          delivery_id: string
+          error_message: string | null
+          id: string
+          payload: Json
+          response_body: string | null
+          status: string
+          status_code: number | null
+          verification_id: string | null
+          webhook_url: string
+        }
+        Insert: {
+          attempt_number?: number
+          completed_at?: string | null
+          created_at?: string
+          delivery_id: string
+          error_message?: string | null
+          id?: string
+          payload: Json
+          response_body?: string | null
+          status?: string
+          status_code?: number | null
+          verification_id?: string | null
+          webhook_url: string
+        }
+        Update: {
+          attempt_number?: number
+          completed_at?: string | null
+          created_at?: string
+          delivery_id?: string
+          error_message?: string | null
+          id?: string
+          payload?: Json
+          response_body?: string | null
+          status?: string
+          status_code?: number | null
+          verification_id?: string | null
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_delivery_logs_verification_id_fkey"
+            columns: ["verification_id"]
+            isOneToOne: false
+            referencedRelation: "business_verifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
