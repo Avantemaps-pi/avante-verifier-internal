@@ -2,7 +2,7 @@ import { useState } from "react";
 import { VerificationForm } from "@/components/VerificationForm";
 import { VerificationResults } from "@/components/VerificationResults";
 import { PaymentHistory } from "@/components/PaymentHistory";
-import { PricingTable } from "@/components/PricingTable";
+
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -65,8 +65,6 @@ const Index = () => {
             </div>
           )}
 
-          {/* Pricing Table - Hidden since all users are enterprise tier */}
-          {/* <PricingTable /> */}
 
           {/* Payment History */}
           <div className="flex justify-center">
