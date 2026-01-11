@@ -333,13 +333,7 @@ export const PaymentHistory = () => {
           <span className="ml-2 text-muted-foreground">Loading payments...</span>
         </div>
       ) : payments.length === 0 && !hasActiveFilters() ? (
-        <div className="text-center py-8">
-          <Receipt className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-          <p className="text-muted-foreground">No payment records found</p>
-          <p className="text-sm text-muted-foreground/70 mt-1">
-            Your premium feature purchases will appear here
-          </p>
-        </div>
+        <div className="py-4" />
       ) : (
         <div className="space-y-4">
           {/* Summary Card */}
