@@ -56,42 +56,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_records: {
-        Row: {
-          amount: number
-          created_at: string
-          external_user_id: string
-          id: string
-          memo: string | null
-          payment_id: string
-          status: string
-          txid: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          external_user_id: string
-          id?: string
-          memo?: string | null
-          payment_id: string
-          status?: string
-          txid?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          external_user_id?: string
-          id?: string
-          memo?: string | null
-          payment_id?: string
-          status?: string
-          txid?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       user_subscriptions: {
         Row: {
           billing_period: Database["public"]["Enums"]["billing_period"] | null
