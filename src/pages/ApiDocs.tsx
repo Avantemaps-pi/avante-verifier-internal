@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Copy, Check } from "lucide-react";
+import { ArrowLeft, Copy, Check, Search, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SyntaxHighlighter } from "@/components/SyntaxHighlighter";
 import { ApiPlayground } from "@/components/ApiPlayground";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 const CodeBlock = ({ code, language = "json" }: { code: string; language?: string }) => {
   return <SyntaxHighlighter code={code} language={language} />;
@@ -38,20 +39,44 @@ const EndpointUrl = ({ url }: { url: string }) => {
   );
 };
 
-const Section = ({ title, id, children }: { title: string; id: string; children: React.ReactNode }) => (
-  <section id={id} className="scroll-mt-24">
-    <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
-      <span className="w-1 h-6 bg-primary rounded-full" />
-      {title}
-    </h2>
-    {children}
-  </section>
-);
+const Section = ({ title, id, children, hidden }: { title: string; id: string; children: React.ReactNode; hidden?: boolean }) => {
+  if (hidden) return null;
+  return (
+    <section id={id} className="scroll-mt-24">
+      <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
+        <span className="w-1 h-6 bg-primary rounded-full" />
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+};
 
 const ApiDocs = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const baseUrl = `${supabaseUrl}/functions/v1/verify-business`;
   const batchUrl = `${supabaseUrl}/functions/v1/verify-business-batch`;
+
+  // Searchable content mapping
+  const searchableContent = useMemo(() => ({
+    overview: ["overview", "verify", "wallet", "transactions", "unique wallets", "cache", "thresholds", "100", "10"],
+    playground: ["playground", "test", "try", "api"],
+    authentication: ["authentication", "auth", "api key", "x-api-key", "header"],
+    single: ["single", "verification", "walletAddress", "businessName", "externalUserId", "forceRefresh", "minTransactions", "minUniqueWallets", "stellar", "wallet"],
+    batch: ["batch", "multiple", "verifications", "10 wallets"],
+    response: ["response", "format", "success", "cached", "data", "verificationId", "meetsRequirements", "verificationStatus", "approved"],
+    errors: ["error", "400", "401", "429", "500", "invalid", "missing", "rate limit", "internal server"],
+  }), []);
+
+  const isVisible = (sectionId: string) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    const content = searchableContent[sectionId as keyof typeof searchableContent] || [];
+    return content.some(term => term.toLowerCase().includes(query)) || 
+           sectionId.toLowerCase().includes(query);
+  };
 
   const basicExample = `curl -X POST "${baseUrl}" \\
   -H "Content-Type: application/json" \\
@@ -133,12 +158,33 @@ const ApiDocs = () => {
         {/* Sidebar */}
         <aside className="hidden lg:block w-48 shrink-0">
           <nav className="sticky top-24 space-y-1">
+            <div className="relative mb-4">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search docs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 pr-8 h-8 text-xs"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Contents</p>
             {tableOfContents.map((item) => (
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="block py-1.5 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                className={`block py-1.5 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors ${
+                  !isVisible(item.id) ? "opacity-40" : ""
+                }`}
               >
                 {item.label}
               </a>
@@ -160,7 +206,7 @@ const ApiDocs = () => {
             </p>
           </div>
 
-          <Section title="Overview" id="overview">
+          <Section title="Overview" id="overview" hidden={!isVisible("overview")}>
             <div className="space-y-4">
               <p className="text-muted-foreground">
                 Verify Pi Network wallet activity for businesses. Default thresholds: <strong className="text-foreground">100 transactions</strong> and <strong className="text-foreground">10 unique wallets</strong>.
@@ -182,11 +228,11 @@ const ApiDocs = () => {
             </div>
           </Section>
 
-          <Section title="API Playground" id="playground">
+          <Section title="API Playground" id="playground" hidden={!isVisible("playground")}>
             <ApiPlayground baseUrl={baseUrl} batchUrl={batchUrl} />
           </Section>
 
-          <Section title="Authentication" id="authentication">
+          <Section title="Authentication" id="authentication" hidden={!isVisible("authentication")}>
             <div className="space-y-3">
               <p className="text-muted-foreground">
                 Include your API key in the <code className="bg-muted px-1.5 py-0.5 rounded text-sm">x-api-key</code> header.
@@ -195,7 +241,7 @@ const ApiDocs = () => {
             </div>
           </Section>
 
-          <Section title="Single Verification" id="single">
+          <Section title="Single Verification" id="single" hidden={!isVisible("single")}>
             <div className="space-y-4">
               <EndpointUrl url={baseUrl} />
               
@@ -247,7 +293,7 @@ const ApiDocs = () => {
             </div>
           </Section>
 
-          <Section title="Batch Verification" id="batch">
+          <Section title="Batch Verification" id="batch" hidden={!isVisible("batch")}>
             <div className="space-y-4">
               <EndpointUrl url={batchUrl} />
               <p className="text-muted-foreground text-sm">
@@ -257,7 +303,7 @@ const ApiDocs = () => {
             </div>
           </Section>
 
-          <Section title="Response Format" id="response">
+          <Section title="Response Format" id="response" hidden={!isVisible("response")}>
             <div className="space-y-4">
               <Tabs defaultValue="success" className="w-full">
                 <TabsList>
@@ -274,7 +320,7 @@ const ApiDocs = () => {
             </div>
           </Section>
 
-          <Section title="Error Codes" id="errors">
+          <Section title="Error Codes" id="errors" hidden={!isVisible("errors")}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -304,6 +350,15 @@ const ApiDocs = () => {
               </table>
             </div>
           </Section>
+
+          {searchQuery && !Object.keys(searchableContent).some(id => isVisible(id)) && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No results found for "{searchQuery}"</p>
+              <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")} className="mt-2">
+                Clear search
+              </Button>
+            </div>
+          )}
         </main>
       </div>
     </div>
