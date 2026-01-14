@@ -1,12 +1,41 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Copy, Check } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SyntaxHighlighter } from "@/components/SyntaxHighlighter";
 import { ApiPlayground } from "@/components/ApiPlayground";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 const CodeBlock = ({ code, language = "json" }: { code: string; language?: string }) => {
   return <SyntaxHighlighter code={code} language={language} />;
+};
+
+const EndpointUrl = ({ url }: { url: string }) => {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast({ title: "Copied!", description: "URL copied to clipboard" });
+    setTimeout(() => setCopied(false), 2000);
+  };
+  
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded font-mono text-xs">POST</span>
+      <code className="text-muted-foreground text-xs flex-1 truncate">{url}</code>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0"
+        onClick={handleCopy}
+      >
+        {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+      </Button>
+    </div>
+  );
 };
 
 const Section = ({ title, id, children }: { title: string; id: string; children: React.ReactNode }) => (
@@ -168,10 +197,7 @@ const ApiDocs = () => {
 
           <Section title="Single Verification" id="single">
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded font-mono text-xs">POST</span>
-                <code className="text-muted-foreground text-xs">{baseUrl}</code>
-              </div>
+              <EndpointUrl url={baseUrl} />
               
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -223,10 +249,7 @@ const ApiDocs = () => {
 
           <Section title="Batch Verification" id="batch">
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded font-mono text-xs">POST</span>
-                <code className="text-muted-foreground text-xs">{batchUrl}</code>
-              </div>
+              <EndpointUrl url={batchUrl} />
               <p className="text-muted-foreground text-sm">
                 Verify up to 10 wallets in a single request.
               </p>
