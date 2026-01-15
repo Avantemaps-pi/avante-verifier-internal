@@ -63,7 +63,7 @@ const ApiDocs = () => {
   const searchableContent = useMemo(() => ({
     overview: ["overview", "verify", "wallet", "transactions", "unique wallets", "cache", "thresholds", "100", "10"],
     playground: ["playground", "test", "try", "api"],
-    "api-key-setup": ["api key", "setup", "generate", "secret", "configure", "PI_API_KEY", "openssl", "avante maps", "secrets", "environment"],
+    "api-key-setup": ["api key", "setup", "generate", "secret", "configure", "VERIFIER_API_KEY", "openssl", "avante maps", "secrets", "environment"],
     authentication: ["authentication", "auth", "api key", "x-api-key", "header"],
     single: ["single", "verification", "walletAddress", "businessName", "externalUserId", "forceRefresh", "minTransactions", "minUniqueWallets", "stellar", "wallet"],
     batch: ["batch", "multiple", "verifications", "10 wallets"],
@@ -280,12 +280,12 @@ const response = await fetch(\`\${VERIFICATION_API.baseUrl}/verify-business\`, {
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-foreground">Step 2: Configure This Project</h3>
                 <p className="text-muted-foreground text-sm">
-                  Add the generated key as the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">PI_API_KEY</code> secret in Lovable Cloud:
+                  Add the generated key as the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">VERIFIER_API_KEY</code> secret in Lovable Cloud:
                 </p>
                 <ol className="list-decimal list-inside text-muted-foreground text-sm space-y-2 ml-2">
                   <li>Open the Avante Business Verifier project in Lovable</li>
                   <li>Navigate to <strong className="text-foreground">Settings → Secrets</strong></li>
-                  <li>Add or update the secret named <code className="bg-muted px-1.5 py-0.5 rounded text-xs">PI_API_KEY</code></li>
+                  <li>Add or update the secret named <code className="bg-muted px-1.5 py-0.5 rounded text-xs">VERIFIER_API_KEY</code></li>
                   <li>Paste your generated key as the value</li>
                 </ol>
               </div>
@@ -306,7 +306,7 @@ const response = await fetch(\`\${VERIFICATION_API.baseUrl}/verify-business\`, {
                 <div className="grid sm:grid-cols-2 gap-3 text-sm">
                   <div className="flex items-start gap-2">
                     <span className="text-primary">→</span>
-                    <span className="text-muted-foreground"><strong className="text-foreground">This project:</strong> PI_API_KEY secret</span>
+                    <span className="text-muted-foreground"><strong className="text-foreground">This project:</strong> VERIFIER_API_KEY secret</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-primary">→</span>
