@@ -481,7 +481,7 @@ serve(async (req) => {
 
     // Validate API key using timing-safe comparison
     const apiKey = req.headers.get('x-api-key');
-    const expectedApiKey = Deno.env.get('PI_API_KEY');
+    const expectedApiKey = Deno.env.get('VERIFIER_API_KEY');
     
     if (!apiKey || !expectedApiKey || !timingSafeEqual(apiKey, expectedApiKey)) {
       return new Response(

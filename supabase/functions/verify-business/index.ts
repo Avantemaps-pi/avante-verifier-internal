@@ -363,7 +363,7 @@ serve(async (req) => {
 
     // Authentication: Accept either API key (for external API access) or Supabase auth header (for internal frontend calls)
     const apiKey = req.headers.get('x-api-key');
-    const validApiKey = Deno.env.get('PI_API_KEY');
+    const validApiKey = Deno.env.get('VERIFIER_API_KEY');
     const authHeader = req.headers.get('authorization');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const apiKeyHeader = req.headers.get('apikey');
