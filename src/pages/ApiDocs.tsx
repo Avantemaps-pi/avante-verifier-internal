@@ -63,6 +63,7 @@ const ApiDocs = () => {
   const searchableContent = useMemo(() => ({
     overview: ["overview", "verify", "wallet", "transactions", "unique wallets", "cache", "thresholds", "100", "10"],
     playground: ["playground", "test", "try", "api"],
+    "api-key-setup": ["api key", "setup", "generate", "secret", "configure", "PI_API_KEY", "openssl", "avante maps", "secrets", "environment"],
     authentication: ["authentication", "auth", "api key", "x-api-key", "header"],
     single: ["single", "verification", "walletAddress", "businessName", "externalUserId", "forceRefresh", "minTransactions", "minUniqueWallets", "stellar", "wallet"],
     batch: ["batch", "multiple", "verifications", "10 wallets"],
@@ -128,9 +129,36 @@ const ApiDocs = () => {
   "error": "Invalid wallet address format"
 }`;
 
+  const apiKeyGeneration = `# Generate a secure 32-byte API key
+openssl rand -base64 32
+
+# Example output:
+# K7xP2mN9qR4vL8wE3yH6jT1uC5oA0sF2bG9dI4kM7nQ=`;
+
+  const avanteMapUsage = `// In Avante Maps: src/config/api.ts or similar
+const VERIFICATION_API = {
+  baseUrl: "${supabaseUrl}/functions/v1",
+  apiKey: process.env.PI_VERIFIER_API_KEY // or your env variable
+};
+
+// Making a verification request
+const response = await fetch(\`\${VERIFICATION_API.baseUrl}/verify-business\`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-api-key': VERIFICATION_API.apiKey
+  },
+  body: JSON.stringify({
+    walletAddress: 'GXXX...',
+    businessName: 'My Business',
+    externalUserId: 'user_123'
+  })
+});`;
+
   const tableOfContents = [
     { id: "overview", label: "Overview" },
     { id: "playground", label: "API Playground" },
+    { id: "api-key-setup", label: "API Key Setup" },
     { id: "authentication", label: "Authentication" },
     { id: "single", label: "Single Verification" },
     { id: "batch", label: "Batch Verification" },
@@ -230,6 +258,63 @@ const ApiDocs = () => {
 
           <Section title="API Playground" id="playground" hidden={!isVisible("playground")}>
             <ApiPlayground baseUrl={baseUrl} batchUrl={batchUrl} />
+          </Section>
+
+          <Section title="API Key Setup" id="api-key-setup" hidden={!isVisible("api-key-setup")}>
+            <div className="space-y-6">
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                <p className="text-amber-400 text-sm font-medium mb-1">⚠️ Important</p>
+                <p className="text-muted-foreground text-sm">
+                  The API key must be identical in both projects. Keep it secure and never commit it to version control.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-foreground">Step 1: Generate a Secure Key</h3>
+                <p className="text-muted-foreground text-sm">
+                  Use OpenSSL to generate a cryptographically secure API key:
+                </p>
+                <CodeBlock code={apiKeyGeneration} language="bash" />
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-foreground">Step 2: Configure This Project</h3>
+                <p className="text-muted-foreground text-sm">
+                  Add the generated key as the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">PI_API_KEY</code> secret in Lovable Cloud:
+                </p>
+                <ol className="list-decimal list-inside text-muted-foreground text-sm space-y-2 ml-2">
+                  <li>Open the Avante Business Verifier project in Lovable</li>
+                  <li>Navigate to <strong className="text-foreground">Settings → Secrets</strong></li>
+                  <li>Add or update the secret named <code className="bg-muted px-1.5 py-0.5 rounded text-xs">PI_API_KEY</code></li>
+                  <li>Paste your generated key as the value</li>
+                </ol>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-foreground">Step 3: Configure Avante Maps</h3>
+                <p className="text-muted-foreground text-sm">
+                  Store the same API key in the Avante Maps project and use it when making requests:
+                </p>
+                <CodeBlock code={avanteMapUsage} language="typescript" />
+                <p className="text-muted-foreground text-sm">
+                  Store the API key as an environment variable (e.g., <code className="bg-muted px-1.5 py-0.5 rounded text-xs">PI_VERIFIER_API_KEY</code>) in Avante Maps' secrets or environment configuration.
+                </p>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4 space-y-2">
+                <p className="text-foreground font-medium text-sm">Quick Reference</p>
+                <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary">→</span>
+                    <span className="text-muted-foreground"><strong className="text-foreground">This project:</strong> PI_API_KEY secret</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary">→</span>
+                    <span className="text-muted-foreground"><strong className="text-foreground">Avante Maps:</strong> x-api-key header</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </Section>
 
           <Section title="Authentication" id="authentication" hidden={!isVisible("authentication")}>
