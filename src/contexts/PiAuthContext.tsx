@@ -101,7 +101,6 @@ export const PiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [autoAuthenticate]);
 
-
   // Manual login kept for edge cases but typically not needed
   const login = useCallback(async () => {
     await autoAuthenticate();
