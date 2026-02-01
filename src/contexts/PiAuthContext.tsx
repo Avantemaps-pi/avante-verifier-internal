@@ -30,14 +30,47 @@ export const PiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoading, setIsLoading] = useState(false);
   const [isSDKReady, setIsSDKReady] = useState(false);
 
-  // Initialize Pi SDK when script loads
+  // Handle incomplete payments (required by SDK)
+  const handleIncompletePayment = useCallback((payment: PiPaymentData) => {
+    console.log('Incomplete payment found:', payment);
+  }, []);
+
+  // Auto-authenticate function
+  const autoAuthenticate = useCallback(async () => {
+    if (!window.Pi || isLoading || user) return;
+    
+    setIsLoading(true);
+    try {
+      const authResult: PiAuthResult = await window.Pi.authenticate(
+        ['username', 'payments', 'wallet_address'],
+        handleIncompletePayment
+      );
+
+      const piUser: PiUser = {
+        uid: authResult.user.uid,
+        username: authResult.user.username,
+        accessToken: authResult.accessToken,
+      };
+
+      setUser(piUser);
+      console.log('Pi auto-authentication successful:', piUser.username);
+    } catch (error) {
+      console.error('Pi auto-authentication failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, user, handleIncompletePayment]);
+
+  // Initialize Pi SDK and auto-authenticate when script loads
   useEffect(() => {
-    const initPiSDK = () => {
+    const initAndAuth = async () => {
       if (window.Pi) {
         try {
           window.Pi.init({ version: '2.0', sandbox: false });
           setIsSDKReady(true);
           console.log('Pi SDK initialized successfully');
+          // Auto-authenticate immediately after SDK init
+          await autoAuthenticate();
         } catch (error) {
           console.error('Failed to initialize Pi SDK:', error);
         }
@@ -46,12 +79,12 @@ export const PiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Check if SDK is already loaded
     if (window.Pi) {
-      initPiSDK();
+      initAndAuth();
     } else {
       // Wait for SDK to load
       const checkInterval = setInterval(() => {
         if (window.Pi) {
-          initPiSDK();
+          initAndAuth();
           clearInterval(checkInterval);
         }
       }, 100);
@@ -66,45 +99,13 @@ export const PiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return () => clearInterval(checkInterval);
     }
-  }, []);
+  }, [autoAuthenticate]);
 
-  // Handle incomplete payments (required by SDK)
-  const handleIncompletePayment = useCallback((payment: PiPaymentData) => {
-    console.log('Incomplete payment found:', payment);
-    // For now, just log incomplete payments
-    // In a full implementation, you would handle payment completion here
-  }, []);
 
+  // Manual login kept for edge cases but typically not needed
   const login = useCallback(async () => {
-    if (!window.Pi) {
-      toast.error('Pi SDK not available. Please open this app in Pi Browser.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Request username scope for authentication
-      const authResult: PiAuthResult = await window.Pi.authenticate(
-        ['username', 'payments', 'wallet_address'],
-        handleIncompletePayment
-      );
-
-      const piUser: PiUser = {
-        uid: authResult.user.uid,
-        username: authResult.user.username,
-        accessToken: authResult.accessToken,
-      };
-
-      setUser(piUser);
-      toast.success(`Welcome, ${piUser.username}!`);
-      console.log('Pi authentication successful:', piUser);
-    } catch (error) {
-      console.error('Pi authentication failed:', error);
-      toast.error('Authentication failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [handleIncompletePayment]);
+    await autoAuthenticate();
+  }, [autoAuthenticate]);
 
   const logout = useCallback(() => {
     setUser(null);

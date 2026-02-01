@@ -2,7 +2,6 @@ import { Menu, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { PiLoginButton } from "@/components/PiLoginButton";
 import {
   Sheet,
   SheetContent,
@@ -28,7 +27,6 @@ export function MobileNav() {
           <SheetTitle>Menu</SheetTitle>
         </SheetHeader>
         <nav className="flex flex-col gap-4 mt-6">
-          <PiLoginButton />
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Theme</span>
             <ThemeToggle />
