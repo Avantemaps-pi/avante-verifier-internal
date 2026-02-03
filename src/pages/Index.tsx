@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { VerificationForm } from "@/components/VerificationForm";
 import { VerificationResults } from "@/components/VerificationResults";
-import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { usePiAuth } from "@/contexts/PiAuthContext";
@@ -47,13 +46,12 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Verification Form and Subscription Status */}
-          <div className="flex flex-col lg:flex-row gap-6 justify-center items-start">
+          {/* Verification Form */}
+          <div className="flex justify-center">
             <VerificationForm 
               onVerificationComplete={setVerificationData} 
               piUsername={user?.username}
             />
-            <SubscriptionManagement />
           </div>
 
           {/* Results */}
