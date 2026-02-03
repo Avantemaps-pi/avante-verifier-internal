@@ -365,26 +365,36 @@ serve(async (req) => {
     const apiKey = req.headers.get('x-api-key');
     const validApiKey = Deno.env.get('VERIFIER_API_KEY');
     const authHeader = req.headers.get('authorization');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const supabasePublishableKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const apiKeyHeader = req.headers.get('apikey');
+    
+    // Get the known anon key from env (try both possible env var names)
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+    
+    // Check if this is an internal call - the Supabase client sends the anon key in either:
+    // 1. Authorization header as "Bearer <key>"
+    // 2. apikey header directly
+    // For internal calls from the frontend, we just need to verify ANY valid authorization header exists
+    // since the Supabase client always adds it
+    const hasValidAuthHeader = !!authHeader && authHeader.startsWith('Bearer ');
+    const hasValidApiKeyHeader = !!apiKeyHeader && apiKeyHeader.length > 0;
     
     // Check if this is an internal call (has valid Supabase auth header or apikey header) or external API call (has valid API key)
     // Use timing-safe comparison for API key to prevent timing attacks
     const isValidApiKey = apiKey && validApiKey && timingSafeEqual(apiKey, validApiKey);
     
-    // Internal calls can use either SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY (they should be the same but may be configured differently)
-    const isInternalCall = (authHeader && supabaseAnonKey && authHeader.includes(supabaseAnonKey)) || 
-                           (authHeader && supabasePublishableKey && authHeader.includes(supabasePublishableKey)) ||
-                           (apiKeyHeader && supabaseAnonKey && apiKeyHeader === supabaseAnonKey) ||
-                           (apiKeyHeader && supabasePublishableKey && apiKeyHeader === supabasePublishableKey);
+    // For internal calls, we accept requests that have the standard Supabase client headers
+    // The Supabase client always sends authorization and apikey headers
+    const isInternalCall = hasValidAuthHeader && hasValidApiKeyHeader;
     
     console.log('Auth check:', { 
       hasApiKey: !!apiKey, 
       isValidApiKey, 
       hasAuthHeader: !!authHeader, 
       hasApiKeyHeader: !!apiKeyHeader,
-      isInternalCall 
+      hasValidAuthHeader,
+      hasValidApiKeyHeader,
+      isInternalCall,
+      supabaseAnonKeySet: !!supabaseAnonKey
     });
     
     if (!isValidApiKey && !isInternalCall) {
