@@ -1,3 +1,4 @@
+// Pi Network Authentication Context - Auto-authenticates on app load
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { PiAuthResult, PiPaymentData } from '@/types/pi-sdk';
 import { toast } from 'sonner';
