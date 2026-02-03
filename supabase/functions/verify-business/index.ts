@@ -366,13 +366,18 @@ serve(async (req) => {
     const validApiKey = Deno.env.get('VERIFIER_API_KEY');
     const authHeader = req.headers.get('authorization');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabasePublishableKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
     const apiKeyHeader = req.headers.get('apikey');
     
     // Check if this is an internal call (has valid Supabase auth header or apikey header) or external API call (has valid API key)
     // Use timing-safe comparison for API key to prevent timing attacks
     const isValidApiKey = apiKey && validApiKey && timingSafeEqual(apiKey, validApiKey);
+    
+    // Internal calls can use either SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY (they should be the same but may be configured differently)
     const isInternalCall = (authHeader && supabaseAnonKey && authHeader.includes(supabaseAnonKey)) || 
-                           (apiKeyHeader && supabaseAnonKey && timingSafeEqual(apiKeyHeader, supabaseAnonKey));
+                           (authHeader && supabasePublishableKey && authHeader.includes(supabasePublishableKey)) ||
+                           (apiKeyHeader && supabaseAnonKey && apiKeyHeader === supabaseAnonKey) ||
+                           (apiKeyHeader && supabasePublishableKey && apiKeyHeader === supabasePublishableKey);
     
     console.log('Auth check:', { 
       hasApiKey: !!apiKey, 
