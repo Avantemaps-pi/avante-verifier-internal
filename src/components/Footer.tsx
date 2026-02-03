@@ -8,26 +8,6 @@ export const Footer = () => {
           <div className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Avante Business Verifier. All rights reserved.
           </div>
-          <nav className="flex items-center gap-6">
-            <Link 
-              to="/privacy" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Privacy Policy
-            </Link>
-            <Link 
-              to="/terms" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Terms of Service
-            </Link>
-            <a 
-              href="mailto:support@avante.io" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Contact
-            </a>
-          </nav>
         </div>
       </div>
     </footer>
