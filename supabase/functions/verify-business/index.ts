@@ -16,6 +16,7 @@ interface VerifyBusinessRequest {
   webhookUrl?: string;
   webhookSecret?: string;
   minTransactions?: number;
+  minCreditedTransactions?: number;
   minUniqueWallets?: number;
 }
 
@@ -437,11 +438,13 @@ serve(async (req) => {
       webhookUrl, 
       webhookSecret,
       minTransactions,
+      minCreditedTransactions,
       minUniqueWallets
     }: VerifyBusinessRequest = await req.json();
     
     // Use request-level overrides if provided, otherwise fall back to environment defaults
     const effectiveMinTransactions = minTransactions ?? DEFAULT_MIN_TRANSACTIONS;
+    const effectiveMinCreditedTransactions = minCreditedTransactions ?? DEFAULT_MIN_CREDITED_TRANSACTIONS;
     const effectiveMinUniqueWallets = minUniqueWallets ?? DEFAULT_MIN_UNIQUE_WALLETS;
     
     console.log('Received verification request:', { 
@@ -451,6 +454,7 @@ serve(async (req) => {
       forceRefresh, 
       webhookUrl: webhookUrl ? '[provided]' : undefined,
       minTransactions: effectiveMinTransactions,
+      minCreditedTransactions: effectiveMinCreditedTransactions,
       minUniqueWallets: effectiveMinUniqueWallets
     });
 
@@ -601,7 +605,7 @@ serve(async (req) => {
     // Business rules evaluation using effective thresholds
     // Requirements: 100+ total transactions, 50+ credited (incoming), 10+ unique wallets
     const meetsTransactionRequirement = totalTransactions >= effectiveMinTransactions;
-    const meetsCreditedRequirement = creditedTransactions >= DEFAULT_MIN_CREDITED_TRANSACTIONS;
+    const meetsCreditedRequirement = creditedTransactions >= effectiveMinCreditedTransactions;
     const meetsWalletRequirement = uniqueWallets >= effectiveMinUniqueWallets;
     const meetsRequirements = meetsTransactionRequirement && meetsCreditedRequirement && meetsWalletRequirement;
     
@@ -611,7 +615,7 @@ serve(async (req) => {
       failureReasons.push(`Insufficient total transactions (${totalTransactions}/${effectiveMinTransactions})`);
     }
     if (!meetsCreditedRequirement) {
-      failureReasons.push(`Insufficient credited/incoming transactions (${creditedTransactions}/${DEFAULT_MIN_CREDITED_TRANSACTIONS})`);
+      failureReasons.push(`Insufficient credited/incoming transactions (${creditedTransactions}/${effectiveMinCreditedTransactions})`);
     }
     if (!meetsWalletRequirement) {
       failureReasons.push(`Insufficient unique wallets (${uniqueWallets}/${effectiveMinUniqueWallets})`);
