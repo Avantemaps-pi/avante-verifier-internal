@@ -238,10 +238,14 @@ function isValidPiWalletAddress(address: string): boolean {
 // Fetch all payments for an account with pagination from Pi Network blockchain
 async function fetchAccountPayments(walletAddress: string): Promise<{
   totalTransactions: number;
+  creditedTransactions: number;
+  debitedTransactions: number;
   uniqueWallets: Set<string>;
 }> {
   const uniqueWallets = new Set<string>();
   let totalTransactions = 0;
+  let creditedTransactions = 0;
+  let debitedTransactions = 0;
   let cursor: string | undefined;
   const limit = 200;
   
@@ -271,7 +275,7 @@ async function fetchAccountPayments(walletAddress: string): Promise<{
       if (!response.ok) {
         if (response.status === 404) {
           console.log('Account not found on Pi Network blockchain');
-          return { totalTransactions: 0, uniqueWallets: new Set() };
+          return { totalTransactions: 0, creditedTransactions: 0, debitedTransactions: 0, uniqueWallets: new Set() };
         }
         throw new Error(`Pi Network API error: ${response.status} ${response.statusText}`);
       }
@@ -288,6 +292,13 @@ async function fetchAccountPayments(walletAddress: string): Promise<{
       for (const payment of records) {
         if (['payment', 'path_payment', 'path_payment_strict_send', 'path_payment_strict_receive'].includes(payment.type)) {
           totalTransactions++;
+          
+          // Credited = incoming (wallet is receiver), Debited = outgoing (wallet is sender)
+          if (payment.to === walletAddress) {
+            creditedTransactions++;
+          } else if (payment.from === walletAddress) {
+            debitedTransactions++;
+          }
           
           const counterparty = payment.from === walletAddress ? payment.to : payment.from;
           if (counterparty && counterparty !== walletAddress) {
@@ -308,8 +319,8 @@ async function fetchAccountPayments(walletAddress: string): Promise<{
       }
     }
     
-    console.log(`Total transactions found: ${totalTransactions}, Unique wallets: ${uniqueWallets.size}`);
-    return { totalTransactions, uniqueWallets };
+    console.log(`Total transactions found: ${totalTransactions}, Credited: ${creditedTransactions}, Debited: ${debitedTransactions}, Unique wallets: ${uniqueWallets.size}`);
+    return { totalTransactions, creditedTransactions, debitedTransactions, uniqueWallets };
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('Pi Network API request timed out');
@@ -319,17 +330,24 @@ async function fetchAccountPayments(walletAddress: string): Promise<{
   }
 }
 
+// Minimum credited transactions requirement
+const DEFAULT_MIN_CREDITED_TRANSACTIONS = parseInt(Deno.env.get('MIN_CREDITED_TRANSACTIONS') || '50');
+
 // Verify wallet on Pi Network blockchain
 async function verifyWalletOnPiNetwork(walletAddress: string): Promise<{
   totalTransactions: number;
+  creditedTransactions: number;
+  debitedTransactions: number;
   uniqueWallets: number;
 }> {
   console.log(`Querying Pi Network blockchain for wallet: ${walletAddress}`);
   
-  const { totalTransactions, uniqueWallets } = await fetchAccountPayments(walletAddress);
+  const { totalTransactions, creditedTransactions, debitedTransactions, uniqueWallets } = await fetchAccountPayments(walletAddress);
   
   return {
     totalTransactions,
+    creditedTransactions,
+    debitedTransactions,
     uniqueWallets: uniqueWallets.size,
   };
 }
@@ -576,23 +594,30 @@ serve(async (req) => {
 
     // Query real Pi Network blockchain
     console.log('Querying Pi Network blockchain...');
-    const { totalTransactions, uniqueWallets } = await verifyWalletOnPiNetwork(walletAddress.trim());
+    const { totalTransactions, creditedTransactions, debitedTransactions, uniqueWallets } = await verifyWalletOnPiNetwork(walletAddress.trim());
     
-    console.log('Pi Network blockchain data:', { totalTransactions, uniqueWallets });
+    console.log('Pi Network blockchain data:', { totalTransactions, creditedTransactions, debitedTransactions, uniqueWallets });
 
     // Business rules evaluation using effective thresholds
-    const meetsRequirements = totalTransactions >= effectiveMinTransactions && uniqueWallets >= effectiveMinUniqueWallets;
-    let failureReason: string | null = null;
+    // Requirements: 100+ total transactions, 50+ credited (incoming), 10+ unique wallets
+    const meetsTransactionRequirement = totalTransactions >= effectiveMinTransactions;
+    const meetsCreditedRequirement = creditedTransactions >= DEFAULT_MIN_CREDITED_TRANSACTIONS;
+    const meetsWalletRequirement = uniqueWallets >= effectiveMinUniqueWallets;
+    const meetsRequirements = meetsTransactionRequirement && meetsCreditedRequirement && meetsWalletRequirement;
     
-    if (!meetsRequirements) {
-      if (totalTransactions < effectiveMinTransactions && uniqueWallets < effectiveMinUniqueWallets) {
-        failureReason = `Insufficient transactions (${totalTransactions}/${effectiveMinTransactions}) and unique wallets (${uniqueWallets}/${effectiveMinUniqueWallets})`;
-      } else if (totalTransactions < effectiveMinTransactions) {
-        failureReason = `Insufficient transactions (${totalTransactions}/${effectiveMinTransactions})`;
-      } else {
-        failureReason = `Insufficient unique wallets (${uniqueWallets}/${effectiveMinUniqueWallets})`;
-      }
+    let failureReasons: string[] = [];
+    
+    if (!meetsTransactionRequirement) {
+      failureReasons.push(`Insufficient total transactions (${totalTransactions}/${effectiveMinTransactions})`);
     }
+    if (!meetsCreditedRequirement) {
+      failureReasons.push(`Insufficient credited/incoming transactions (${creditedTransactions}/${DEFAULT_MIN_CREDITED_TRANSACTIONS})`);
+    }
+    if (!meetsWalletRequirement) {
+      failureReasons.push(`Insufficient unique wallets (${uniqueWallets}/${effectiveMinUniqueWallets})`);
+    }
+    
+    const failureReason = failureReasons.length > 0 ? failureReasons.join('; ') : null;
     
     const verificationStatus = meetsRequirements ? 'approved' : 'rejected';
 
