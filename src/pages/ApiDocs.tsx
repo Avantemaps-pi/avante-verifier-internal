@@ -61,11 +61,11 @@ const ApiDocs = () => {
 
   // Searchable content mapping
   const searchableContent = useMemo(() => ({
-    overview: ["overview", "verify", "wallet", "transactions", "unique wallets", "cache", "thresholds", "100", "10"],
+    overview: ["overview", "verify", "wallet", "transactions", "unique wallets", "cache", "thresholds", "100", "10", "50", "credited", "incoming"],
     playground: ["playground", "test", "try", "api"],
     "api-key-setup": ["api key", "setup", "generate", "secret", "configure", "VERIFIER_API_KEY", "openssl", "avante maps", "secrets", "environment"],
     authentication: ["authentication", "auth", "api key", "x-api-key", "header"],
-    single: ["single", "verification", "walletAddress", "businessName", "externalUserId", "forceRefresh", "minTransactions", "minUniqueWallets", "stellar", "wallet"],
+    single: ["single", "verification", "walletAddress", "businessName", "externalUserId", "forceRefresh", "minTransactions", "minCreditedTransactions", "minUniqueWallets", "stellar", "wallet", "credited", "incoming"],
     batch: ["batch", "multiple", "verifications", "10 wallets"],
     response: ["response", "format", "success", "cached", "data", "verificationId", "meetsRequirements", "verificationStatus", "approved"],
     errors: ["error", "400", "401", "429", "500", "invalid", "missing", "rate limit", "internal server"],
@@ -237,12 +237,16 @@ const response = await fetch(\`\${VERIFICATION_API.baseUrl}/verify-business\`, {
           <Section title="Overview" id="overview" hidden={!isVisible("overview")}>
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                Verify Pi Network wallet activity for businesses. Default thresholds: <strong className="text-foreground">100 transactions</strong> and <strong className="text-foreground">10 unique wallets</strong>.
+                Verify Pi Network wallet activity for businesses. Default thresholds: <strong className="text-foreground">100 total transactions</strong> (at least <strong className="text-foreground">50 credited/incoming</strong>) and <strong className="text-foreground">10 unique wallets</strong>.
               </p>
-              <div className="grid sm:grid-cols-3 gap-3">
+              <div className="grid sm:grid-cols-4 gap-3">
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-xl font-bold text-primary">100+</p>
-                  <p className="text-xs text-muted-foreground">Min transactions</p>
+                  <p className="text-xs text-muted-foreground">Total transactions</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-xl font-bold text-green-400">50+</p>
+                  <p className="text-xs text-muted-foreground">Credited (incoming)</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-xl font-bold text-primary">10+</p>
@@ -363,12 +367,17 @@ const response = await fetch(\`\${VERIFICATION_API.baseUrl}/verify-business\`, {
                     <tr className="border-b border-border/50">
                       <td className="py-2 px-3 font-mono text-primary text-xs">minTransactions</td>
                       <td className="py-2 px-3">No</td>
-                      <td className="py-2 px-3">Custom threshold (default: 100)</td>
+                      <td className="py-2 px-3">Min total transactions (default: 100)</td>
+                    </tr>
+                    <tr className="border-b border-border/50">
+                      <td className="py-2 px-3 font-mono text-green-400 text-xs">minCreditedTransactions</td>
+                      <td className="py-2 px-3">No</td>
+                      <td className="py-2 px-3">Min credited/incoming transactions (default: 50)</td>
                     </tr>
                     <tr className="border-b border-border/50">
                       <td className="py-2 px-3 font-mono text-primary text-xs">minUniqueWallets</td>
                       <td className="py-2 px-3">No</td>
-                      <td className="py-2 px-3">Custom threshold (default: 10)</td>
+                      <td className="py-2 px-3">Min unique wallets (default: 10)</td>
                     </tr>
                   </tbody>
                 </table>
