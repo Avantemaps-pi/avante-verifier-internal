@@ -7,6 +7,7 @@ interface VerificationResultsProps {
   walletAddress: string;
   businessName: string;
   totalTransactions: number;
+  creditedTransactions?: number;
   uniqueWallets: number;
   meetsRequirements: boolean;
   failureReason: string | null;
@@ -18,7 +19,8 @@ export const VerificationResults = ({
   verificationId,
   walletAddress,
   businessName,
-  totalTransactions, 
+  totalTransactions,
+  creditedTransactions,
   uniqueWallets,
   meetsRequirements,
   failureReason,
@@ -80,7 +82,7 @@ export const VerificationResults = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className={`p-6 rounded-xl bg-gradient-to-br ${status.bg} border ${status.border}`}>
           <div className="flex items-center gap-2 mb-2">
             <Wallet className={`w-5 h-5 ${status.color}`} />
@@ -88,6 +90,15 @@ export const VerificationResults = ({
           </div>
           <p className={`text-4xl font-bold ${status.color}`}>{totalTransactions.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground mt-1">Required: 100+</p>
+        </div>
+
+        <div className={`p-6 rounded-xl bg-gradient-to-br ${status.bg} border ${status.border}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Wallet className={`w-5 h-5 ${status.color}`} />
+            <p className="text-sm text-muted-foreground">Credited (Incoming)</p>
+          </div>
+          <p className={`text-4xl font-bold ${status.color}`}>{(creditedTransactions ?? 0).toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-1">Required: 50+</p>
         </div>
 
         <div className={`p-6 rounded-xl bg-gradient-to-br ${status.bg} border ${status.border}`}>

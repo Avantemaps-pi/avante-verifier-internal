@@ -9,6 +9,7 @@ interface VerificationData {
   walletAddress: string;
   businessName: string;
   totalTransactions: number;
+  creditedTransactions?: number;
   uniqueWallets: number;
   meetsRequirements: boolean;
   failureReason: string | null;
