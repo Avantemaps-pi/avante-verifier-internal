@@ -240,8 +240,18 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
 
             <div className="grid sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="minTransactions" className="text-foreground">
+                <Label htmlFor="minTransactions" className="text-foreground flex items-center gap-1.5">
                   Min Total Transactions
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Total number of transactions (both incoming and outgoing) associated with this wallet address.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </Label>
                 <Input
                   id="minTransactions"
@@ -282,8 +292,18 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="minUniqueWallets" className="text-foreground">
+                <Label htmlFor="minUniqueWallets" className="text-foreground flex items-center gap-1.5">
                   Min Unique Wallets
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Number of distinct wallet addresses that have transacted with this business. Higher counts indicate a broader customer base.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </Label>
                 <Input
                   id="minUniqueWallets"
