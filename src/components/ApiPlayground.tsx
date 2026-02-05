@@ -39,6 +39,7 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
   const [forceRefresh, setForceRefresh] = useState(false);
   const [minTransactions, setMinTransactions] = useState("100");
   const [minUniqueWallets, setMinUniqueWallets] = useState("10");
+  const [minCreditedTransactions, setMinCreditedTransactions] = useState("50");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<VerificationResult | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
@@ -65,11 +66,15 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
       // Only include thresholds if they differ from defaults
       const minTx = parseInt(minTransactions);
       const minWallets = parseInt(minUniqueWallets);
+      const minCredited = parseInt(minCreditedTransactions);
       if (!isNaN(minTx) && minTx !== 100) {
         requestBody.minTransactions = minTx;
       }
       if (!isNaN(minWallets) && minWallets !== 10) {
         requestBody.minUniqueWallets = minWallets;
+      }
+      if (!isNaN(minCredited) && minCredited !== 50) {
+        requestBody.minCreditedTransactions = minCredited;
       }
       
       const res = await fetch(baseUrl, {
@@ -113,11 +118,14 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
   const generateCurlCommand = () => {
     const minTx = parseInt(minTransactions);
     const minWallets = parseInt(minUniqueWallets);
-    const hasCustomThresholds = (!isNaN(minTx) && minTx !== 100) || (!isNaN(minWallets) && minWallets !== 10);
+    const minCredited = parseInt(minCreditedTransactions);
     
     let thresholdParams = "";
     if (!isNaN(minTx) && minTx !== 100) {
       thresholdParams += `,\n    "minTransactions": ${minTx}`;
+    }
+    if (!isNaN(minCredited) && minCredited !== 50) {
+      thresholdParams += `,\n    "minCreditedTransactions": ${minCredited}`;
     }
     if (!isNaN(minWallets) && minWallets !== 10) {
       thresholdParams += `,\n    "minUniqueWallets": ${minWallets}`;
@@ -223,10 +231,10 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="minTransactions" className="text-foreground">
-                  Minimum Transactions
+                  Min Total Transactions
                 </Label>
                 <Input
                   id="minTransactions"
@@ -241,8 +249,24 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="minCreditedTransactions" className="text-foreground">
+                  Min Credited Transactions
+                </Label>
+                <Input
+                  id="minCreditedTransactions"
+                  type="number"
+                  min="1"
+                  placeholder="50"
+                  value={minCreditedTransactions}
+                  onChange={(e) => setMinCreditedTransactions(e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Default: 50</p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="minUniqueWallets" className="text-foreground">
-                  Minimum Unique Wallets
+                  Min Unique Wallets
                 </Label>
                 <Input
                   id="minUniqueWallets"
