@@ -5,7 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Play, Loader2, Copy, Check, AlertCircle } from "lucide-react";
+import { Info } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PlaygroundProps {
   baseUrl: string;
@@ -249,8 +256,18 @@ export const ApiPlayground = ({ baseUrl, batchUrl }: PlaygroundProps) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="minCreditedTransactions" className="text-foreground">
+                <Label htmlFor="minCreditedTransactions" className="text-foreground flex items-center gap-1.5">
                   Min Credited Transactions
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Credited transactions are payments <strong>received</strong> by this wallet (incoming Pi). This helps verify real business activity from customers.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </Label>
                 <Input
                   id="minCreditedTransactions"
